@@ -37,7 +37,7 @@ k = 2;
 if k==1
     varname = 'RawChange';
 elseif k==2
-    varname = 'ratio';
+    varname = 'Normalised Improvement';
 end
 
 target=targetarray(:,k);
