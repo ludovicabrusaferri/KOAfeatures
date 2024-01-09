@@ -33,7 +33,7 @@ ROIs = cat(2, SC, CC);
 
 % Set target and predictors for regression
 targetarray = [rawChange,ratio];
-k = 2;
+k = 1;
 if k==1
     varname = 'RawChange';
 elseif k==2
@@ -45,7 +45,7 @@ input = TKApainpre;
 predictorsCombined = [input, ROIs, genotype];
 
 % Lasso regularization for feature selection
-[BCombined, FitInfoCombined] = lasso(predictorsCombined, target);
+[BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
 
 % Identify non-zero coefficients (selected features)
 selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
