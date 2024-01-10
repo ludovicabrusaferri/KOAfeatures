@@ -4,7 +4,7 @@ clc;
 
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/ForLudoo.xlsx';
-
+u
 % Import data from Excel file
 data = importdata(dataFilePath);
 
