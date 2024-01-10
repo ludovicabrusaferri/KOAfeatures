@@ -3,7 +3,7 @@ clear all;
 clc;
 
 % Set the data file path
-dataFilePath = '/Users/luto/Dropbox/KOAfeatures/ForLudoo.xlsx';
+dataFilePath = '/Users/e410377/Desktop/KOAfeatures/ForLudoo.xlsx';
 
 % Import data from Excel file
 data = importdata(dataFilePath);
