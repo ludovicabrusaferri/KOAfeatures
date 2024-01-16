@@ -32,12 +32,19 @@ ROIs = cat(2, SC, CC);
 %% %% ====== PREDICTIONSß ===========
 
 ALL=[rawChange,ratio,TKApainpre,ROIs, genotype];
-%rowsToKeep = ratio~=1;
+% Define the pattern
+pattern = 'SC|CC';
+% Use regexp to find indices where the numericTitles match the pattern
+indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
+numericTitles_sub=numericTitles(indices);
+numericTitles_sub=[numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))),numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
-%ALL(~rowsToKeep, :) = [];
+rowsToKeep = ratio~=1;
+
+ALL(~rowsToKeep, :) = [];
 % Set target and predictors for regression
 targetarray = ALL(:,1:2);
-k =1;
+k =2;
 if k==1
     varname = 'RawChange';
 elseif k==2
@@ -59,6 +66,7 @@ selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', '
     
 % Use the selected features for modeling
 selectedFeatures = predictorsCombined(:, selectedFeaturesidx);
+selectednumericTitles_sub=numericTitles_sub(:, selectedFeaturesidx);
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
