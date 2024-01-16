@@ -37,7 +37,7 @@ ALL=[rawChange,ratio,TKApainpre,ROIs, genotype];
 %ALL(~rowsToKeep, :) = [];
 % Set target and predictors for regression
 targetarray = ALL(:,1:2);
-k =2;
+k =1;
 if k==1
     varname = 'RawChange';
 elseif k==2
@@ -49,7 +49,7 @@ input = ALL(:,3);
 predictorsCombined =  ALL(:,3:end);
 
 % Lasso regularization for feature selection
-[BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
+%[BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
 
 % Identify non-zero coefficients (selected features)
 %selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
