@@ -4,7 +4,7 @@ clc;
 
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/ForLudoo.xlsx';
-u
+
 % Import data from Excel file
 data = importdata(dataFilePath);
 
@@ -31,9 +31,13 @@ ROIs = cat(2, SC, CC);
 
 %% %% ====== PREDICTIONSß ===========
 
+ALL=[rawChange,ratio,TKApainpre,ROIs, genotype];
+%rowsToKeep = ratio~=1;
+
+%ALL(~rowsToKeep, :) = [];
 % Set target and predictors for regression
-targetarray = [rawChange,ratio];
-k = 1;
+targetarray = ALL(:,1:2);
+k =2;
 if k==1
     varname = 'RawChange';
 elseif k==2
@@ -41,14 +45,20 @@ elseif k==2
 end
 
 target=targetarray(:,k);
-input = TKApainpre;
-predictorsCombined = [input, ROIs, genotype];
+input = ALL(:,3);
+predictorsCombined =  ALL(:,3:end);
 
 % Lasso regularization for feature selection
 [BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
 
 % Identify non-zero coefficients (selected features)
-selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
+%selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
+options = statset('UseParallel',true);
+numSelectedFeatures = 10; % Choose the desired number of features
+selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'Nfeatures', numSelectedFeatures);
+    
+% Use the selected features for modeling
+selectedFeatures = predictorsCombined(:, selectedFeaturesidx);
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -134,3 +144,21 @@ ylabel('Normalized RawChange');
 set(gca, 'FontSize', 25);
 hold off;
 set(gcf, 'Color', 'w');
+%%
+figure(22)
+var=ROIs(:,3);
+group=zeros(size(var,1),1);
+rowsToKeep = idx==3|idx==4;
+group(rowsToKeep,:)=1;
+pv=PlotGroupDifferenceNoCovariates(age,group,[0.2, 0.2, 0.2],'m',1,2)
+title(sprintf('SUVR, p=%.2f',pv))
+% Define tick locations
+xticks([1 2]);
+xticklabels({'cluster$\sim=$4', 'cluster4'});
+hold off
+%%
+function crit = critfun(x, y)
+    mdl = fitlm(x, y);
+    crit = mdl.RMSE;
+end
+
