@@ -39,9 +39,9 @@ indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
 numericTitles_sub=[numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))),numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
-rowsToKeep = ratio~=1;
+%rowsToKeep = ratio~=1;
 
-ALL(~rowsToKeep, :) = [];
+%ALL(~rowsToKeep, :) = [];
 % Set target and predictors for regression
 targetarray = ALL(:,1:2);
 k =2;
@@ -61,7 +61,7 @@ predictorsCombined =  ALL(:,3:end);
 % Identify non-zero coefficients (selected features)
 %selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
 options = statset('UseParallel',true);
-numSelectedFeatures = 10; % Choose the desired number of features
+numSelectedFeatures = 20; % Choose the desired number of features
 selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'Nfeatures', numSelectedFeatures);
     
 % Use the selected features for modeling
