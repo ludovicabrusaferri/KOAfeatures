@@ -50,7 +50,7 @@ indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
 
 
-k =5;
+k =3;
 
 if k==1
     varname = 'RawChange TKA';      
