@@ -50,7 +50,7 @@ indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
 
 
-k =3;
+k =5;
 
 if k==1
     varname = 'RawChange TKA';      
@@ -96,7 +96,7 @@ end
 
 
 model="linear";
-
+plot_training=0;
 %%
 
 % Initialize result containers
@@ -211,61 +211,66 @@ set(gcf, 'Color', 'w');
 %%
 
 %% plot training
+plot_training=0;
+if (plot_training)
+    % Plot correlations and regression lines
+    figure(4)
+    subplot(1, 2, 1);
+    [rho1, p1] = PlotSimpleCorrelationWithRegression(targetTrain, mdl1.Fitted, 30, 'b');
+    title({"Training: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
+    ylabel('Predicted');
+    
+    ylabel('Predicted');
+    xlabel('True');
+    hold off;
+    
+    subplot(1, 2, 2);
+    [rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, mdlCombined.Fitted, 30, 'b');
+    title({"Training: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+    ylabel('Predicted');
+    xlabel('True');
+    hold off;
+    
+    %% ====== CLUSTERING =========== (let's see what to do here...)
+    
+    % Combine variables for clustering
+    dataForClustering = [TKApainpre, rawChangeTKA];
+    
+    % Normalize the data between min and max
+    dataForClustering = normalize(dataForClustering, 'range');
+    
+    % Specify the number of clusters (k=4)
+    numClusters = 4;
+    
+    % Set the random seed for reproducibility
+    rng(42);
+    
+    % Run k-means clustering
+    [idx, centers] = kmeans(dataForClustering, numClusters);
+    
+    % Plot the results
+    figure;
+    for i = 1:numClusters
+        clusterIndices = idx == i;
+        scatter(dataForClustering(clusterIndices, 1), dataForClustering(clusterIndices, 2), 40, 'filled', 'DisplayName', ['Cluster ' num2str(i)]);
+        hold on;
+    end
+    
+    scatter(centers(:, 1), centers(:, 2), 200, 'X', 'LineWidth', 2, 'DisplayName', 'Cluster Centers');
+    
+    % Add legend and labels
+    legend('show');
+    title('K-Means Clustering (Normalized)');
+    xlabel('Normalized TKApainpre');
+    ylabel('Normalized RawChange');
+    set(gca, 'FontSize', 25);
+    hold off;
+    set(gcf, 'Color', 'w');
+    %%
 
-% Plot correlations and regression lines
-figure(4)
-subplot(1, 2, 1);
-[rho1, p1] = PlotSimpleCorrelationWithRegression(targetTrain, mdl1.Fitted, 30, 'b');
-title({"Training: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
-ylabel('Predicted');
-
-ylabel('Predicted');
-xlabel('True');
-hold off;
-
-subplot(1, 2, 2);
-[rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, mdlCombined.Fitted, 30, 'b');
-title({"Training: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-ylabel('Predicted');
-xlabel('True');
-hold off;
-
-%% ====== CLUSTERING =========== (let's see what to do here...)
-
-% Combine variables for clustering
-dataForClustering = [TKApainpre, rawChangeTKA];
-
-% Normalize the data between min and max
-dataForClustering = normalize(dataForClustering, 'range');
-
-% Specify the number of clusters (k=4)
-numClusters = 4;
-
-% Set the random seed for reproducibility
-rng(42);
-
-% Run k-means clustering
-[idx, centers] = kmeans(dataForClustering, numClusters);
-
-% Plot the results
-figure;
-for i = 1:numClusters
-    clusterIndices = idx == i;
-    scatter(dataForClustering(clusterIndices, 1), dataForClustering(clusterIndices, 2), 40, 'filled', 'DisplayName', ['Cluster ' num2str(i)]);
-    hold on;
+    else
+    fprintf('hii')
 end
-
-scatter(centers(:, 1), centers(:, 2), 200, 'X', 'LineWidth', 2, 'DisplayName', 'Cluster Centers');
-
-% Add legend and labels
-legend('show');
-title('K-Means Clustering (Normalized)');
-xlabel('Normalized TKApainpre');
-ylabel('Normalized RawChange');
-set(gca, 'FontSize', 25);
-hold off;
-set(gcf, 'Color', 'w');
-%%
 
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
