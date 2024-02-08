@@ -21,13 +21,14 @@ TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 
+eps = 0.000000000000001;
 % Calculate "RawChange"
 rawChangeTKA = TKApainpost - TKApainpre;
-ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre);
+ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre+eps);
 
 % Calculate "RawChange"
 rawChangeWO = WOpainpost - WOpainpre;
-ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre);
+ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre+eps);
 
 %GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
