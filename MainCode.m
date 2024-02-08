@@ -3,7 +3,8 @@ clear all;
 clc;
 
 % Set the data file path
-dataFilePath = '/Users/e410377/Desktop/KOAfeatures/ForLudoo.xlsx';
+dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
+addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
 
 % Import data from Excel file
 data = importdata(dataFilePath);
@@ -15,23 +16,33 @@ numericTitles = data.textdata(1, 2:end);
 % Extract relevant variables
 age = numericData(:, strcmp(numericTitles, 'Age (pre)'));
 genotype = numericData(:, strcmp(numericTitles, 'Genotype (1=GG)'));
-TKApainpre = numericData(:, strcmp(numericTitles, 'TKA painpre'));
-TKApainpost = numericData(:, strcmp(numericTitles, 'TKA painpost'));
+TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
+TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
+WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
+WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 
 % Calculate "RawChange"
-rawChange = TKApainpost - TKApainpre;
-% Load and process additional data
-ratio = numericData(:, strcmp(numericTitles, 'RATIO'));
-GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
+rawChangeTKA = TKApainpost - TKApainpre;
+ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre);
+
+% Calculate "RawChange"
+rawChangeWO = WOpainpost - WOpainpre;
+ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre);
+
+%GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
 
-
+mdl=fitglm(rawChangeTKA,TKApainpre);
+rawChangeTKAadj=mdl.Residuals.Raw;
+mdl=fitglm(rawChangeWO,WOpainpre);
+rawChangeWOadj=mdl.Residuals.Raw;
 %% %% ====== PREDICTIONSß ===========
 
-ALL=[rawChange,ratio,TKApainpre,ROIs, genotype];
+ALL=[rawChangeTKA,rawChangeTKAadj, ratioTKA,rawChangeWO,rawChangeWOadj,ratioWO, TKApainpre,WOpainpre, ROIs, genotype];
+
 % Define the pattern
 pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
@@ -39,21 +50,38 @@ indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
 numericTitles_sub=[numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))),numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
-%rowsToKeep = ratio~=1;
 
-%ALL(~rowsToKeep, :) = [];
-% Set target and predictors for regression
-targetarray = ALL(:,1:2);
-k =2;
+targetarray = ALL(:,1:6);
+k =6;
+
 if k==1
-    varname = 'RawChange';
+    varname = 'RawChange TKA';
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
 elseif k==2
-    varname = 'Normalised Improvement';
+    varname = 'RawChange TKA adj';
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
+elseif k==3
+    varname = 'Normalised Improvement TKA';
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
+elseif k==4
+    varname = 'RawChange WO';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
+elseif k==5
+    varname = 'RawChange WO adj';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
+elseif k==6
+    varname = 'Normalised Improvement WO';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
 end
 
 target=targetarray(:,k);
-input = ALL(:,3);
-predictorsCombined =  ALL(:,3:end);
+
 
 % Lasso regularization for feature selection
 %[BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
@@ -120,7 +148,7 @@ hold off;
 %% ====== CLUSTERING =========== (let's see what to do here...)
 
 % Combine variables for clustering
-dataForClustering = [TKApainpre, rawChange];
+dataForClustering = [TKApainpre, rawChangeTKA];
 
 % Normalize the data between min and max
 dataForClustering = normalize(dataForClustering, 'range');
@@ -153,17 +181,17 @@ set(gca, 'FontSize', 25);
 hold off;
 set(gcf, 'Color', 'w');
 %%
-figure(22)
-var=ROIs(:,3);
-group=zeros(size(var,1),1);
-rowsToKeep = idx==3|idx==4;
-group(rowsToKeep,:)=1;
-pv=PlotGroupDifferenceNoCovariates(age,group,[0.2, 0.2, 0.2],'m',1,2)
-title(sprintf('SUVR, p=%.2f',pv))
+%figure(22)
+%var=ROIs(:,3);
+%group=zeros(size(var,1),1);
+%rowsToKeep = idx==3|idx==1|idx==4
+%group(~rowsToKeep,:)=1;
+%pv=PlotGroupDifferenceNoCovariates(var,group,[0.2, 0.2, 0.2],'m',1,2)
+%title(sprintf('SUVR, p=%.2f',pv))
 % Define tick locations
-xticks([1 2]);
-xticklabels({'cluster$\sim=$4', 'cluster4'});
-hold off
+%xticks([1 2]);
+%xticklabels({'cluster$\sim=$4', 'cluster4'});
+%hold off
 %%
 function crit = critfun(x, y)
     mdl = fitlm(x, y);

@@ -3,8 +3,8 @@ clear all;
 clc;
 
 % Set the data file path
-%dataFilePath = '/Users/luto/Dropbox/KOAfeatures/ForLudoo.xlsx';
-dataFilePath = '/Users/e410377/Desktop/KOAfeatures/ForLudoo.xlsx';
+dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
+addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
 
 % Import data from Excel file
 data = importdata(dataFilePath);
@@ -16,49 +16,88 @@ numericTitles = data.textdata(1, 2:end);
 % Extract relevant variables
 age = numericData(:, strcmp(numericTitles, 'Age (pre)'));
 genotype = numericData(:, strcmp(numericTitles, 'Genotype (1=GG)'));
-TKApainpre = numericData(:, strcmp(numericTitles, 'TKA painpre'));
-TKApainpost = numericData(:, strcmp(numericTitles, 'TKA painpost'));
+TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
+TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
+WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
+WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 
 % Calculate "RawChange"
-rawChange = TKApainpost - TKApainpre;
-% Load and process additional data
-ratio = numericData(:, strcmp(numericTitles, 'RATIO'));
-GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
+rawChangeTKA = TKApainpost - TKApainpre;
+ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre);
+
+% Calculate "RawChange"
+rawChangeWO = WOpainpost - WOpainpre;
+ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre);
+
+%GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
 
-mdl=fitglm(rawChange,TKApainpre);
-rawChangeAdj=mdl.Residuals.Raw;
-
+mdl=fitglm(rawChangeTKA,TKApainpre);
+rawChangeTKAadj=mdl.Residuals.Raw;
+mdl=fitglm(rawChangeWO,WOpainpre);
+rawChangeWOadj=mdl.Residuals.Raw;
 %% %% ====== PREDICTIONSß ===========
-var=rawChangeAdj; rawChangeAdj2=(var - min(var))./(max(var) - min(var));
-var=TKApainpre;TKApainpre2=(var - min(var))./(max(var) - min(var));
-ALL=[rawChangeAdj2,ratio,TKApainpre2,ROIs, genotype];
 
-%rowsToKeep = ratio~=1;
+ALL=[rawChangeTKA,rawChangeTKAadj, ratioTKA,rawChangeWO,rawChangeWOadj,ratioWO, TKApainpre,WOpainpre, ROIs, genotype];
 
-%ALL(~rowsToKeep, :) = [];
-% Set target and predictors for regression
-targetarray = ALL(:,1:2);
-k =2;
-if k==1
-    varname = 'RawChange residuals';
-elseif k==2
-    varname = 'Normalised Improvement';
-end
-
-target=targetarray(:,k);
-input = ALL(:,3);
-predictorsCombined =  ALL(:,3:end);
-
+% Define the pattern
 pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
-numericTitles_sub=[numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))),numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
+
+k =3;
+
+if k==1
+    varname = 'RawChange TKA';      
+    ALL(isnan(ALL(:,k)),:)=[];
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
+    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+elseif k==2
+    ALL(isnan(ALL(:,k)),:)=[];
+    varname = 'RawChange TKA adj';
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
+    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+elseif k==3
+    ALL(isnan(ALL(:,k)),:)=[];
+    varname = 'Normalised Improvement TKA';
+    input = ALL(:,7);
+    predictorsCombined = ALL(:, [7, 9:end]);
+    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+elseif k==4
+    varname = 'RawChange WO';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
+    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+elseif k==5
+    varname = 'RawChange WO adj';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
+    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+elseif k==6
+    varname = 'Normalised Improvement WO';
+    input = ALL(:,8);
+    predictorsCombined = ALL(:,8:end);
+    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+    target=ALL(:,k);
+end
+
+
+
+model="linear";
+
+%%
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -70,6 +109,7 @@ for i = 1:numel(target)
     targetTrain = target;
     targetTrain(i) = [];
     targetTest = target(i);
+    % Check if targetTest is NaN, and continue to the next iteration if true
     
     inputTrain = input;
     inputTrain(i) = [];
@@ -78,23 +118,10 @@ for i = 1:numel(target)
     predictorsCombinedTrain = predictorsCombined;
 
     predictorsCombinedTrain(i, :) = [];
-
-    % Lasso regularization for feature selection
-    %lambda = logspace(-0.2, 2, 100);
-    %[BCombined, FitInfoCombined] = lasso(predictorsCombinedTrain, targetTrain); % can this be oustide the loop?
-    % Example for Elastic Net
-    
-    % Elastic Net regularization for feature selection
-    %alpha = 0.0001; % You can adjust the 'Alpha' parameter based on your needs
-    %[BCombined, FitInfoCombined] = lasso(predictorsCombinedTrain, targetTrain);
-
-    % Identify non-zero coefficients (selected features)
-    %selectedFeatures = predictorsCombinedTrain(:, BCombined(:, 1) ~= 0);
-    % Perform feature selection using recursive feature elimination
     numSelectedFeatures = 10; % Choose the desired number of features
     
-    options = statset('UseParallel',true);
-    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options, 'Nfeatures', numSelectedFeatures);
+    %options = statset('UseParallel',true);
+    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'Nfeatures', numSelectedFeatures);
     
     % Use the selected features for modeling
     selectedFeatures = predictorsCombinedTrain(:, selectedFeaturesidx);
@@ -116,14 +143,22 @@ for i = 1:numel(target)
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain, targetTrain);
     predictions1(i) = predict(mdl1, inputTest);
+    
+    % Choose the appropriate model based on the value of 'model'
+    if strcmp(model, "linear")
+        mdlCombined = fitlm(selectedFeatures, targetTrain);
+    elseif strcmp(model, "svm")
+        mdlCombined = fitrsvm(selectedFeatures, targetTrain);
+    elseif strcmp(model, "dt")
+        mdlCombined = fitrtree(selectedFeatures, targetTrain, 'OptimizeHyperparameters', 'all');
+    else
+        break; % You might want to handle the case where 'model' is not recognized
+    end
 
-    % Fit linear model with selected predictors for combined vs target
-    mdlCombined = fitlm(selectedFeatures, targetTrain);
     predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
     fprintf('DONE..%d\n',i);
     P=[P;selectednumericTitles_sub];
 end
-
 
 % Plot correlations and regression lines
 figure;
@@ -166,22 +201,19 @@ figure;
 bar(1:numel(numericTitles_sub), sorted_occurrences, 'BarWidth', 0.8);
 xticks(1:numel(numericTitles_sub));
 xticklabels(numericTitles_sub(sorted_indices));
-xlabel('Numeric Titles Sub');
+xlabel('All ROIs');
 ylabel('Frequency');
-title('Frequency Plot of Numeric Titles Sub in P (Descending Order)');
+title('Frequency Histogram (Descending Order)');
 
-
+set(gca, 'FontSize', 15);
+hold off;
+set(gcf, 'Color', 'w');
 %%
-% Plot the histogram
-figure;
-bar(unique_values, frequency, 'BarWidth', 0.8);
-xlabel('Unique Values in P');
-ylabel('Frequency');
-title('Frequency Histogram of Values in P with respect to numericTitles_sub');
+
 %% plot training
 
 % Plot correlations and regression lines
-figure(2)
+figure(4)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(targetTrain, mdl1.Fitted, 30, 'b');
 title({"Training: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
@@ -201,7 +233,7 @@ hold off;
 %% ====== CLUSTERING =========== (let's see what to do here...)
 
 % Combine variables for clustering
-dataForClustering = [TKApainpre, rawChange];
+dataForClustering = [TKApainpre, rawChangeTKA];
 
 % Normalize the data between min and max
 dataForClustering = normalize(dataForClustering, 'range');
@@ -233,9 +265,9 @@ ylabel('Normalized RawChange');
 set(gca, 'FontSize', 25);
 hold off;
 set(gcf, 'Color', 'w');
+%%
 
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
     crit = mdl.RMSE;
 end
-

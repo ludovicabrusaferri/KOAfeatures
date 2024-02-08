@@ -29,15 +29,16 @@ CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
 
-
+mdl=fitglm(rawChange,TKApainpre);
+rawChangeAdj=mdl.Residuals.Raw;
 %% %% ====== PREDICTIONSß ===========
-ALL = [rawChange, ratio, TKApainpre, ROIs, genotype];
+ALL = [rawChangeAdj, ratio, TKApainpre, ROIs, genotype];
 
 % Set target and predictors for regression
 targetarray = ALL(:, 1:2);
 k = 1;
 if k == 1
-    varname = 'RawChange';
+    varname = 'RawChange residuals';
 elseif k == 2
     varname = 'Normalised Improvement';
 end
@@ -78,7 +79,7 @@ for fold = 1:numFolds
     predictorsCombinedTrain(foldStart:foldEnd, :) = [];
 
     % Lasso regularization for feature selection
-    numSelectedFeatures = 10; % Choose the desired number of features
+    numSelectedFeatures = 30; % Choose the desired number of features
     options = statset('UseParallel', true);
     selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options, 'Nfeatures', numSelectedFeatures);
     
@@ -107,7 +108,14 @@ for fold = 1:numFolds
     mdl1 = fitlm(inputTrain, targetTrain);
     foldPredictions1 = predict(mdl1, inputTest);
 
-    % Fit linear model with selected predictors for combined vs target
+    % Regularization parameter
+    %lambda = 0.1;  % You can adjust the value of lambda
+    
+    % Add regularization term to the predictors and target for training
+    %regularizedPredictors = [selectedFeatures; sqrt(lambda) * eye(size(selectedFeatures, 2))];
+    %regularizedTarget = [targetTrain; zeros(size(selectedFeatures, 2), 1)];
+    
+    % Fit linear model with regularization
     mdlCombined = fitlm(selectedFeatures, targetTrain);
     foldPredictions2 = predict(mdlCombined, predictorsCombinedTest);
 
