@@ -60,7 +60,7 @@ indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub=numericTitles(indices);
 
 
-k =5;
+k =6;
 
 if k==1
     varname = 'RawChange TKA';      
@@ -156,7 +156,7 @@ for fold = 1:numFolds
     X_test_combined_scaled = zscore(X_test_combined);
 
     % Feature selection
-    numSelectedFeatures = 30;
+    numSelectedFeatures = 60;
     selectedFeaturesidx = sequentialfs(@critfun, X_train_combined_scaled, y_train_combined, 'cv', 'none', 'Nfeatures', numSelectedFeatures);
     selectedFeatures = X_train_combined_scaled(:, selectedFeaturesidx);
 
