@@ -140,6 +140,8 @@ for fold = 1:numFolds
     selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
 end
 %STORE=STORE';
+
+%%
 % Plot correlations and regression lines
 figure(1)
 subplot(1, 2, 1);
@@ -150,7 +152,7 @@ ylabel('Predicted');
 xlabel('True');
 hold off;
 ylim([-3, 3])
-
+xlim([-1,1])
 subplot(1, 2, 2);
 [rho2_lasso, p2_lasso] = PlotSimpleCorrelationWithRegression(target, predictions2_lasso', 30, 'b');
 title({"Model: [TkaPre, ROIs, geno] (LASSO) vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2_lasso, p2_lasso)});
@@ -158,6 +160,7 @@ ylabel('Predicted');
 xlabel('True');
 hold off;
 ylim([-3, 3])
+xlim([-1,1])
 
 
 %%
@@ -170,7 +173,8 @@ bar(freq);
 xlabel('Feature Index');
 ylabel('Frequency across Folds');
 title('Selected Features Frequencies over Folds');
-
+set(gcf, 'Color', 'w');
+set(gca,'FontSize',25)
 %%
 
 %% plot training
