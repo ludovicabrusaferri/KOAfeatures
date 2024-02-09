@@ -19,6 +19,7 @@ genotype = numericData(:, strcmp(numericTitles, 'Genotype (1=GG)'));
 TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
+WOstiffpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (stiffness)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 PRpainpre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
 PRpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Promis (pain intensity)'));
@@ -60,8 +61,8 @@ numericTitles_sub = numericTitles(indices);
 
 varname = 'Normalised Improvement WO';
 ALL(isnan(ALL(:, 1)), :) = [];
-input = ALL(:, 3);
-predictorsCombined = ALL(:, 3:end);
+input = ALL(:, 2);
+predictorsCombined = ALL(:, 2:end);
 %numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 target = ALL(:, 1);
 
@@ -74,7 +75,12 @@ predictions2_lasso = zeros(1, numel(target));
 
 P = {};
 numFolds = round(1 * numel(target)); % Number of folds for leave-one-out cross-validation
-
+% Initialize a matrix to store selected features frequencies
+% Initialize a cell array to store selected features for each fold
+% Initialize a matrix to store selected features frequencies
+selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+STORE = [];
+%%
 % Loop for leave-one-out cross-validation
 for fold = 1:numFolds
     % Indices for the current fold
@@ -91,11 +97,11 @@ for fold = 1:numFolds
     predictorsCombinedTestALL = predictorsCombined(testIndices, :);
 
     % Feature engineering
-    polyDegree = 2;
-    polyFeatures = inputTrain.^polyDegree;
+    %polyDegree = 2;
+    %polyFeatures = inputTrain.^polyDegree;
     inputTrain = [inputTrain];%, polyFeatures];
 
-    polyFeaturesTest = inputTest.^polyDegree;
+    %polyFeaturesTest = inputTest.^polyDegree;
     inputTest = [inputTest];%, polyFeaturesTest];
 
     % Fit linear model with input vs target
@@ -124,8 +130,16 @@ for fold = 1:numFolds
     predictions2_lasso(testIndices) = predict(mdlCombined_lasso, predictorsCombinedTest_lasso);
 
     fprintf('DONE.. Fold %d\n', fold);
-end
 
+    % Store the selected features for the current fold
+    selectedFeaturesSTORE(selectedFeaturesIdx) = 1;
+    STORE = [STORE, selectedFeaturesSTORE];
+    fprintf('DONE.. Fold %d\n', fold);
+
+    % Reset selectedFeaturesSTORE for the next fold
+    selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+end
+%STORE=STORE';
 % Plot correlations and regression lines
 figure(1)
 subplot(1, 2, 1);
@@ -135,7 +149,7 @@ title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f",
 ylabel('Predicted');
 xlabel('True');
 hold off;
-%ylim([-3, 3])
+ylim([-3, 3])
 
 subplot(1, 2, 2);
 [rho2_lasso, p2_lasso] = PlotSimpleCorrelationWithRegression(target, predictions2_lasso', 30, 'b');
@@ -143,12 +157,19 @@ title({"Model: [TkaPre, ROIs, geno] (LASSO) vs", sprintf("%s", varname), sprintf
 ylabel('Predicted');
 xlabel('True');
 hold off;
-%ylim([-3, 3])
+ylim([-3, 3])
 
 
 %%
-% Assuming numericTitles_sub is a 1x71 cell array of strings and P_flattened is a cell array of strings
+% Sum the frequencies across folds
+freq = sum(STORE, 2);
 
+% Plot histogram of selected features frequencies
+figure(2);
+bar(freq);
+xlabel('Feature Index');
+ylabel('Frequency across Folds');
+title('Selected Features Frequencies over Folds');
 
 %%
 
