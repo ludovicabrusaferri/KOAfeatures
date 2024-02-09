@@ -52,7 +52,7 @@ rawChangePRadj = mdl.Residuals.Raw;
 %% PREDICTIONS
 
 ALL = [ratioWO, WOpainpre, ROIs, genotype];
-
+%ALL = minmax_scaler_array(ALL);
 % Define the pattern
 pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
@@ -151,16 +151,16 @@ title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f",
 ylabel('Predicted');
 xlabel('True');
 hold off;
-ylim([-3, 3])
-xlim([-1,1])
+%ylim([-3, 3])
+%xlim([-1,1])
 subplot(1, 2, 2);
 [rho2_lasso, p2_lasso] = PlotSimpleCorrelationWithRegression(target, predictions2_lasso', 30, 'b');
 title({"Model: [TkaPre, ROIs, geno] (LASSO) vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2_lasso, p2_lasso)});
 ylabel('Predicted');
 xlabel('True');
 hold off;
-ylim([-3, 3])
-xlim([-1,1])
+%ylim([-3, 3])
+%xlim([-1,1])
 
 
 %%
@@ -242,4 +242,20 @@ end
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
     crit = mdl.RMSE;
+end
+
+function normalized_data = minmax_scaler_array(data_array)
+    % Reshape the 3D array to a 2D matrix
+    reshaped_data = reshape(data_array, [], size(data_array, 3));
+
+    % Calculate min and max values for each column
+    min_vals = min(reshaped_data);
+    max_vals = max(reshaped_data);
+
+    % Perform min-max scaling
+    normalized_data_reshaped = (reshaped_data - min_vals) ./ (max_vals - min_vals);
+
+    % Reshape the normalized data back to the original size
+    normalized_data = reshape(normalized_data_reshaped, size(data_array));
+
 end
