@@ -20,6 +20,8 @@ TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
+PRpainpre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
+PRpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Promis (pain intensity)'));
 
 eps = 0.000000000000001;
 % Calculate "RawChange"
@@ -29,6 +31,11 @@ ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre+eps);
 % Calculate "RawChange"
 rawChangeWO = WOpainpost - WOpainpre;
 ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre+eps);
+
+% Calculate "RawChange"
+rawChangePR = PRpainpost - PRpainpre;
+ratioPR = (PRpainpre-PRpainpost)./(PRpainpost + PRpainpre+eps);
+
 
 %GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
@@ -40,6 +47,8 @@ mdl=fitglm(rawChangeTKA,TKApainpre);
 rawChangeTKAadj=mdl.Residuals.Raw;
 mdl=fitglm(rawChangeWO,WOpainpre);
 rawChangeWOadj=mdl.Residuals.Raw;
+mdl=fitglm(rawChangePR,PRpainpre);
+rawChangePRadj=mdl.Residuals.Raw;
 %% %% ====== PREDICTIONSß ===========
 
 ALL=[rawChangeTKA,rawChangeTKAadj, ratioTKA,rawChangeWO,rawChangeWOadj,ratioWO, TKApainpre,WOpainpre, ROIs, genotype];
@@ -103,62 +112,57 @@ plot_training=0;
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
 predictions2 = zeros(1, numel(target));
-P={};
+P = {};
+numFolds = round(numel(target)); % Number of folds for leave-one-out cross-validation
+
 % Loop for leave-one-out cross-validation
-for i = 1:numel(target)
+for fold = 1:numFolds
+    % Indices for the current fold
+    testIndices = false(1, numFolds);
+    testIndices(fold) = true;
+
     % Create training and testing sets
-    targetTrain = target;
-    targetTrain(i) = [];
-    targetTest = target(i);
-    % Check if targetTest is NaN, and continue to the next iteration if true
-    
-    inputTrain = input;
-    inputTrain(i) = [];
-    inputTest = input(i);
-    
-    predictorsCombinedTrain = predictorsCombined;
+    targetTrain = target(~testIndices);
+    inputTrain = input(~testIndices);
+    predictorsCombinedTrain = predictorsCombined(~testIndices, :);
 
-    predictorsCombinedTrain(i, :) = [];
-    numSelectedFeatures = 10; % Choose the desired number of features
-    
-    %options = statset('UseParallel',true);
+    targetTest = target(testIndices);
+    inputTest = input(testIndices);
+    predictorsCombinedTestALL = predictorsCombined(testIndices, :);
+
+    % Feature selection on training set
+    numSelectedFeatures = 10;
     selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'Nfeatures', numSelectedFeatures);
-    
-    % Use the selected features for modeling
     selectedFeatures = predictorsCombinedTrain(:, selectedFeaturesidx);
-    selectednumericTitles_sub=numericTitles_sub(:, selectedFeaturesidx);
+    selectednumericTitles_sub = numericTitles_sub(:, selectedFeaturesidx);
 
-    idx= [];
-    for j = 1:size(selectedFeatures,2)
-        for k = 1:size(predictorsCombinedTrain,2)
-            if predictorsCombinedTrain(:, k)==selectedFeatures(:, j)
-                idx=[idx,k];
+    idx = [];
+    for j = 1:size(selectedFeatures, 2)
+        for k = 1:size(predictorsCombinedTrain, 2)
+            if isequal(predictorsCombinedTrain(:, k), selectedFeatures(:, j))
+                idx = [idx, k];
             end
         end
     end
-    
-    predictorsCombinedTestALL = predictorsCombined(:,idx);
-    predictorsCombinedTest = predictorsCombinedTestALL(i, :);
 
+    predictorsCombinedTest = predictorsCombinedTestALL(:, idx);
 
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain, targetTrain);
-    predictions1(i) = predict(mdl1, inputTest);
-    
+    predictions1(testIndices) = predict(mdl1, inputTest);
+
     % Choose the appropriate model based on the value of 'model'
     if strcmp(model, "linear")
         mdlCombined = fitlm(selectedFeatures, targetTrain);
     elseif strcmp(model, "svm")
         mdlCombined = fitrsvm(selectedFeatures, targetTrain);
-    elseif strcmp(model, "dt")
-        mdlCombined = fitrtree(selectedFeatures, targetTrain, 'OptimizeHyperparameters', 'all');
     else
         break; % You might want to handle the case where 'model' is not recognized
     end
 
-    predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
-    fprintf('DONE..%d\n',i);
-    P=[P;selectednumericTitles_sub];
+    predictions2(testIndices) = predict(mdlCombined, predictorsCombinedTest);
+    fprintf('DONE.. Fold %d\n', fold);
+    P = [P; selectednumericTitles_sub];
 end
 
 % Plot correlations and regression lines
