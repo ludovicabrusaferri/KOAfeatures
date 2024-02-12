@@ -20,156 +20,128 @@ TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
-PRpainpre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
-PRpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Promis (pain intensity)'));
 
-eps = 0.000000000000001;
 % Calculate "RawChange"
 rawChangeTKA = TKApainpost - TKApainpre;
-ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre+eps);
+ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre);
 
 % Calculate "RawChange"
 rawChangeWO = WOpainpost - WOpainpre;
-ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre+eps);
+ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre);
 
-% Calculate "RawChange"
-rawChangePR = PRpainpost - PRpainpre;
-ratioPR = (PRpainpre-PRpainpost)./(PRpainpost + PRpainpre+eps);
-
-
-%GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
+% GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
+% Fit linear models
+mdl = fitglm(rawChangeTKA, TKApainpre);
+rawChangeTKAadj = mdl.Residuals.Raw;
 
-mdl=fitglm(rawChangeTKA,TKApainpre);
-rawChangeTKAadj=mdl.Residuals.Raw;
-mdl=fitglm(rawChangeWO,WOpainpre);
-rawChangeWOadj=mdl.Residuals.Raw;
-mdl=fitglm(rawChangePR,PRpainpre);
-rawChangePRadj=mdl.Residuals.Raw;
-%% %% ====== PREDICTIONSß ===========
+mdl = fitglm(rawChangeWO, WOpainpre);
+rawChangeWOadj = mdl.Residuals.Raw;
 
-ALL=[rawChangeTKA,rawChangeTKAadj, ratioTKA,rawChangeWO,rawChangeWOadj,ratioWO, TKApainpre,WOpainpre, ROIs, genotype];
+%% PREDICTIONS
+
+ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype];
+ALL = normvalues(ALL);
 
 % Define the pattern
 pattern = 'SC|CC';
+
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-numericTitles_sub=numericTitles(indices);
+numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
+targetarray = ALL(:, 1:6);
+k = 6;
 
-k =3;
-
-if k==1
-    varname = 'RawChange TKA';      
-    ALL(isnan(ALL(:,k)),:)=[];
-    input = ALL(:,7);
+if k == 1
+    varname = 'RawChange TKA';
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
-elseif k==2
-    ALL(isnan(ALL(:,k)),:)=[];
+elseif k == 2
     varname = 'RawChange TKA adj';
-    input = ALL(:,7);
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
-elseif k==3
-    ALL(isnan(ALL(:,k)),:)=[];
+elseif k == 3
     varname = 'Normalised Improvement TKA';
-    input = ALL(:,7);
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-    numericTitles_sub=['TKA pain pre',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
-elseif k==4
+elseif k == 4
     varname = 'RawChange WO';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
-    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
-elseif k==5
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
+elseif k == 5
     varname = 'RawChange WO adj';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
-    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
-elseif k==6
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
+elseif k == 6
     varname = 'Normalised Improvement WO';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
-    numericTitles_sub=['Pre-TKA,WOMAC (pain)',numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
-    target=ALL(:,k);
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
 end
 
+target = targetarray(:, k);
+options = statset('UseParallel', true);
 
+optimizeFeatures = false;
 
-model="linear";
-plot_training=0;
-%%
+selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+STORE = [];
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
 predictions2 = zeros(1, numel(target));
-P = {};
-numFolds = round(numel(target)); % Number of folds for leave-one-out cross-validation
 
 % Loop for leave-one-out cross-validation
-for fold = 1:numFolds
-    % Indices for the current fold
-    testIndices = false(1, numFolds);
-    testIndices(fold) = true;
-
+for i = 1:numel(target)
     % Create training and testing sets
-    targetTrain = target(~testIndices);
-    inputTrain = input(~testIndices);
-    predictorsCombinedTrain = predictorsCombined(~testIndices, :);
+    targetTrain = target;
+    targetTrain(i) = [];
+    targetTest = target(i);
+    
+    inputTrain = input;
+    inputTrain(i) = [];
+    inputTest = input(i);
 
-    targetTest = target(testIndices);
-    inputTest = input(testIndices);
-    predictorsCombinedTestALL = predictorsCombined(testIndices, :);
+    predictorsCombinedTrain = predictorsCombined;
+    predictorsCombinedTrain(i, :) = [];
 
-    % Feature selection on training set
-    numSelectedFeatures = 10;
-    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'Nfeatures', numSelectedFeatures);
-    selectedFeatures = predictorsCombinedTrain(:, selectedFeaturesidx);
-    selectednumericTitles_sub = numericTitles_sub(:, selectedFeaturesidx);
-
-    idx = [];
-    for j = 1:size(selectedFeatures, 2)
-        for k = 1:size(predictorsCombinedTrain, 2)
-            if isequal(predictorsCombinedTrain(:, k), selectedFeatures(:, j))
-                idx = [idx, k];
-            end
-        end
+    if optimizeFeatures
+    % Optimize for the optimal number of features
+        selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options);
+    else
+    % Choose a fixed number of features
+        numSelectedFeatures = 20; % Choose the desired number of features
+        selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
     end
 
-    predictorsCombinedTest = predictorsCombinedTestALL(:, idx);
+    predictorsCombinedTrain = predictorsCombinedTrain(:, selectedFeaturesidx);
+    predictorsCombinedTest = predictorsCombined(i, selectedFeaturesidx);
 
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain, targetTrain);
-    predictions1(testIndices) = predict(mdl1, inputTest);
-
-    % Choose the appropriate model based on the value of 'model'
-    if strcmp(model, "linear")
-        mdlCombined = fitlm(selectedFeatures, targetTrain);
-    elseif strcmp(model, "svm")
-        mdlCombined = fitrsvm(selectedFeatures, targetTrain);
-    else
-        break; % You might want to handle the case where 'model' is not recognized
-    end
-
-    predictions2(testIndices) = predict(mdlCombined, predictorsCombinedTest);
-    fprintf('DONE.. Fold %d\n', fold);
-    P = [P; selectednumericTitles_sub];
+    predictions1(i) = predict(mdl1, inputTest);
+    
+    % Fit linear model with selected predictors for combined vs target
+    mdlCombined = fitlm(predictorsCombinedTrain, targetTrain);
+    predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
+    
+    % Store the selected features for the current fold
+    selectedFeaturesSTORE(selectedFeaturesidx) = 1;
+    STORE = [STORE, selectedFeaturesSTORE];
+    % Reset selectedFeaturesSTORE for the next fold
+    selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+    fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
 end
 
 % Plot correlations and regression lines
-figure;
+figure(1)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
 title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
+ylabel('Predicted');
 
 ylabel('Predicted');
 xlabel('True');
@@ -182,102 +154,32 @@ ylabel('Predicted');
 xlabel('True');
 hold off;
 
+% Sum the frequencies across folds
+freq = sum(STORE, 2);
 
-%%
-% Assuming numericTitles_sub is a 1x71 cell array of strings and P_flattened is a cell array of strings
-
-% Flatten P into a column cell array of strings
-P_flattened = P(:);
-
-% Initialize a container for counting occurrences
-occurrences = zeros(size(numericTitles_sub));
-
-% Loop over each entry in numericTitles_sub
-for i = 1:numel(numericTitles_sub)
-    % Count occurrences of the current entry in P_flattened
-    occurrences(i) = sum(strcmp(numericTitles_sub{i}, P_flattened));
-end
-
-% Sort occurrences and get the corresponding indices
-[sorted_occurrences, sorted_indices] = sort(occurrences, 'descend');
-
-% Plot the frequency histogram in descending order
-figure;
-bar(1:numel(numericTitles_sub), sorted_occurrences, 'BarWidth', 0.8);
-xticks(1:numel(numericTitles_sub));
-xticklabels(numericTitles_sub(sorted_indices));
-xlabel('All ROIs');
-ylabel('Frequency');
-title('Frequency Histogram (Descending Order)');
-
-set(gca, 'FontSize', 15);
-hold off;
+% Plot histogram of selected features frequencies
+figure(2);
+bar(freq);
+xlabel('Feature Index');
+ylabel('Frequency across Folds');
+title('Selected Features Frequencies over Folds');
 set(gcf, 'Color', 'w');
+set(gca, 'FontSize', 25);
+
+%% CLUSTER
 %%
-
-%% plot training
-plot_training=0;
-if (plot_training)
-    % Plot correlations and regression lines
-    figure(4)
-    subplot(1, 2, 1);
-    [rho1, p1] = PlotSimpleCorrelationWithRegression(targetTrain, mdl1.Fitted, 30, 'b');
-    title({"Training: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
-    ylabel('Predicted');
-    
-    ylabel('Predicted');
-    xlabel('True');
-    hold off;
-    
-    subplot(1, 2, 2);
-    [rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, mdlCombined.Fitted, 30, 'b');
-    title({"Training: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-    ylabel('Predicted');
-    xlabel('True');
-    hold off;
-    
-    %% ====== CLUSTERING =========== (let's see what to do here...)
-    
-    % Combine variables for clustering
-    dataForClustering = [TKApainpre, rawChangeTKA];
-    
-    % Normalize the data between min and max
-    dataForClustering = normalize(dataForClustering, 'range');
-    
-    % Specify the number of clusters (k=4)
-    numClusters = 4;
-    
-    % Set the random seed for reproducibility
-    rng(42);
-    
-    % Run k-means clustering
-    [idx, centers] = kmeans(dataForClustering, numClusters);
-    
-    % Plot the results
-    figure;
-    for i = 1:numClusters
-        clusterIndices = idx == i;
-        scatter(dataForClustering(clusterIndices, 1), dataForClustering(clusterIndices, 2), 40, 'filled', 'DisplayName', ['Cluster ' num2str(i)]);
-        hold on;
-    end
-    
-    scatter(centers(:, 1), centers(:, 2), 200, 'X', 'LineWidth', 2, 'DisplayName', 'Cluster Centers');
-    
-    % Add legend and labels
-    legend('show');
-    title('K-Means Clustering (Normalized)');
-    xlabel('Normalized TKApainpre');
-    ylabel('Normalized RawChange');
-    set(gca, 'FontSize', 25);
-    hold off;
-    set(gcf, 'Color', 'w');
-    %%
-
-    else
-    fprintf('hii')
-end
-
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
     crit = mdl.RMSE;
+end
+
+function out = normvalues(input)
+    [rows, cols] = size(input);
+    out = zeros(rows, cols);
+
+    for col = 1:cols
+        % Normalize each column separately
+        colData = input(:, col);
+        out(:, col) = (colData - min(colData)) ./ (max(colData) - min(colData));
+    end
 end
