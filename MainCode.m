@@ -21,13 +21,14 @@ TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 
+eps = 0.00000000001;
 % Calculate "RawChange"
 rawChangeTKA = TKApainpost - TKApainpre;
-ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre);
+ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre + eps);
 
 % Calculate "RawChange"
 rawChangeWO = WOpainpost - WOpainpre;
-ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre);
+ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre + eps);
 
 % GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
@@ -35,15 +36,13 @@ CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
 % Fit linear models
-mdl = fitglm(rawChangeTKA, TKApainpre);
-rawChangeTKAadj = mdl.Residuals.Raw;
-
-mdl = fitglm(rawChangeWO, WOpainpre);
-rawChangeWOadj = mdl.Residuals.Raw;
+mdl = fitglm(rawChangeTKA, TKApainpre); rawChangeTKAadj = mdl.Residuals.Raw;
+mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
 
 %% PREDICTIONS
 
 ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype];
+%ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 
 % Define the pattern
@@ -51,38 +50,43 @@ pattern = 'SC|CC';
 
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+%numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
-targetarray = ALL(:, 1:6);
 k = 6;
 
 if k == 1
     varname = 'RawChange TKA';
+    ALL(isnan(ALL(:, 1)), :) = [];
     input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
 elseif k == 2
     varname = 'RawChange TKA adj';
+    ALL(isnan(ALL(:, 1)), :) = [];
     input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
 elseif k == 3
     varname = 'Normalised Improvement TKA';
+    ALL(isnan(ALL(:, 1)), :) = [];
     input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
 elseif k == 4
     varname = 'RawChange WO';
+    ALL(isnan(ALL(:, 4)), :) = [];
     input = ALL(:, 8);
     predictorsCombined = ALL(:, 8:end);
 elseif k == 5
     varname = 'RawChange WO adj';
+    ALL(isnan(ALL(:, 4)), :) = [];
     input = ALL(:, 8);
     predictorsCombined = ALL(:, 8:end);
 elseif k == 6
     varname = 'Normalised Improvement WO';
+    ALL(isnan(ALL(:, 4)), :) = [];
     input = ALL(:, 8);
     predictorsCombined = ALL(:, 8:end);
 end
 
-target = targetarray(:, k);
+target = ALL(:, k);
 options = statset('UseParallel', true);
 
 optimizeFeatures = false;
@@ -139,7 +143,7 @@ for i = 1:numel(target)
 end
 
 % Plot correlations and regression lines
-figure(1)
+figure(3)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
 title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
@@ -160,7 +164,7 @@ hold off;
 freq = sum(STORE, 2);
 
 % Plot histogram of selected features frequencies
-figure(2);
+figure(4);
 bar(freq);
 xlabel('Feature Index');
 ylabel('Frequency across Folds');
