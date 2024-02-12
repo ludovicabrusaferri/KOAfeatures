@@ -1,7 +1,7 @@
 % Clear workspace and command window
 clear all;
 clc;
-
+rng(46);
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
 addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
@@ -20,6 +20,8 @@ TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
+Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
+WOphyspre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (physical function)'));
 
 eps = 0.00000000001;
 % Calculate "RawChange"
@@ -41,7 +43,7 @@ mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
 
 %% PREDICTIONS
 
-ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype];
+ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype,ROIs.*WOpainpre,WOpainpre.*genotype, ROIs.*genotype];
 %ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 
@@ -90,7 +92,8 @@ target = ALL(:, k);
 
 options = statset('UseParallel', true);
 
-optimizeFeatures = true;
+options = "Lasso"; % SequentialsVariable, SequentialsFixed, Lasso
+numSelectedFeatures = 25; % Choose the desired number of features
 
 selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
 STORE = [];
@@ -113,14 +116,19 @@ for i = 1:numel(target)
     predictorsCombinedTrain = predictorsCombined;
     predictorsCombinedTrain(i, :) = [];
 
-    if optimizeFeatures
+    if strcmp(options,'SequentialsVariable')
     % Optimize for the optimal number of features
         selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options);
-    else
+    elseif strcmp(options,'SequentialsFixed')
     % Choose a fixed number of features
-        numSelectedFeatures = 20; % Choose the desired number of features
         selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
+    elseif strcmp(options,'Lasso')
+        % L1 regularization (LASSO) for feature selection
+        [B, FitInfo] = lasso(predictorsCombinedTrain, targetTrain, 'CV', 20); % You can adjust 'CV' as needed
+        idxLambdaMinMSE = FitInfo.IndexMinMSE;
+        selectedFeaturesidx = B(:, idxLambdaMinMSE) ~= 0;
     end
+
 
     predictorsCombinedTrain = predictorsCombinedTrain(:, selectedFeaturesidx);
     predictorsCombinedTest = predictorsCombined(i, selectedFeaturesidx);
@@ -140,13 +148,14 @@ for i = 1:numel(target)
     selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
     fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
 end
-
+%%
 % Plot correlations and regression lines
 figure(1)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
 title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
+xlim([0,1])
 
 ylabel('Predicted');
 xlabel('True');
@@ -158,7 +167,7 @@ title({"Model: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %
 ylabel('Predicted');
 xlabel('True');
 hold off;
-
+xlim([0,1])
 % Sum the frequencies across folds
 freq = sum(STORE, 2);
 
