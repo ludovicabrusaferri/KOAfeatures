@@ -39,6 +39,7 @@ ROIs = cat(2, SC, CC);
 
 % PREDICTIONS
 ALL = [ratioWO, WOpainpre, ROIs, genotype];
+%ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 target = ALL(:, 1);
 ALL(isnan(target), :) = [];
@@ -48,8 +49,8 @@ target = ALL(:, 1);
 input = ALL(:, 2:end);
 %%
 % Implement SVM-based feature selection
-options = statset('UseParallel', true);
-numSelectedFeatures = 25; % Choose the desired number of features
+%options = statset('UseParallel', true);
+numSelectedFeatures = 20; % Choose the desired number of features
 
 selectedFeaturesSTORE = zeros(size(input, 2), 1);
 STORE = [];
