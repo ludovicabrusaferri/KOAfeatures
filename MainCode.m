@@ -45,7 +45,7 @@ mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
 % ... (previous code)
 
 % PREDICTIONS
-ALL = [ratioWO, WOpainpre, ROIs, genotype];
+ALL = [ratioWO, WOpainpre, genotype, ROIs];
 ALL = normvalues(ALL);
 
 varname = 'Normalised Improvement WO';
@@ -143,7 +143,7 @@ pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
-title = ['WOMAC Pain Pre' ,numericTitles_sub,'genotype']';
+title = ['WOMAC Pain Pre','genotype' ,numericTitles_sub]';
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
