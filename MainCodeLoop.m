@@ -105,7 +105,7 @@ for i = 1:numel(target)
         selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
     elseif strcmp(method, "SVM")
         % SVM-based feature selection for regression
-        svmModel = fitrsvm(inputTrain, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
+        svmModel = fitrsvm(inputTrain, targetTrain, 'KernelFunction','linear','Standardize',true);
         featureWeights = abs(svmModel.Beta);
         [~, sortedIndices] = sort(featureWeights, 'descend');
         selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
@@ -141,7 +141,7 @@ end
 
     else
         %mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true,  'KernelFunction', 'linear');
-        mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'KernelFunction','linear','KernelScale','auto', 'Standardize',true);
+        mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'KernelFunction','linear', 'Standardize',true);
     end
     
     predictions2(i) = predict(mdlCombined, inputTestSelected);
