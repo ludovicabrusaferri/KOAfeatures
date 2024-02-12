@@ -50,7 +50,7 @@ rawChangeWOadj = mdlWO.Residuals.Raw;
 %% PREDICTIONS
 
 % Combine relevant features for prediction
-ALL = [(ratioWO), (WOpainpre), ROIs, genotype];
+ALL = [ratioWO, WOpainpre, ROIs, genotype];
 ALL = normvalues(ALL);
 
 varname = 'Normalised Improvement WO';
@@ -62,11 +62,9 @@ target = ALL(:, 1);
 
 % Set options for feature selection
 options = statset('UseParallel', true);
-method = "SequentialsFixed"; % Specify the method
+method = "SVM"; % Specify the method
 numSelectedFeatures = 20; % Choose the desired number of features
 linearmodel = 0;
-
-
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -84,11 +82,12 @@ for i = 1:numel(target)
     inputTrain(i, :) = [];
     inputTest = input(i, :);
 
+    % Feature selection based on the chosen method
     if strcmp(method, 'SequentialsVariable')
-    % Optimize for the optimal number of features
+        % Optimize for the optimal number of features
         selectedFeaturesidx = sequentialfs(@critfun, inputTrain, targetTrain, 'cv', 'none', 'options', options);
     elseif strcmp(method, 'SequentialsFixed')
-    % Choose a fixed number of features
+        % Choose a fixed number of features
         selectedFeaturesidx = sequentialfs(@critfun, inputTrain, targetTrain, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
     elseif strcmp(method, 'Lasso')
         % L1 regularization (LASSO) for feature selection
@@ -102,7 +101,8 @@ for i = 1:numel(target)
         importance = baggedTree.OOBPermutedVarDeltaError;
         [~, sortedIdx] = sort(importance, 'descend');
         selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
-     elseif strcmp(method, "SVM")
+    elseif strcmp(method, "SVM")
+        % SVM-based feature selection for regression
         svmModel = fitrsvm(inputTrain, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
         featureWeights = abs(svmModel.Beta);
         [~, sortedIndices] = sort(featureWeights, 'descend');
@@ -113,10 +113,10 @@ for i = 1:numel(target)
     inputTestSelected = inputTest(:, selectedFeaturesidx);
 
     % Fit linear model with selected predictors for input vs target
-    mdl1 = fitlm(inputTrain(:,1), targetTrain);
+    mdl1 = fitlm(inputTrain(:, 1), targetTrain);
     predictions1(i) = predict(mdl1, inputTest(1));
     
-    % Fit linear model with selected predictors for combined vs target
+    % Fit linear model or SVM with selected predictors for combined vs target
     if linearmodel
         mdlCombined = fitlm(inputTrainSelected, targetTrain);
     else
@@ -165,7 +165,7 @@ set(gca, 'FontSize', 25);
 
 %% CLUSTER
 
-
+% ... (remaining code for clustering, if any)
 
 %%
 function crit = critfun(x, y)
