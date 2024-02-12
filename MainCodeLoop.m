@@ -37,6 +37,15 @@ SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
+% Perform PCA on ROIs
+%[coeff, score, latent, ~, explained] = pca(ROIs);
+
+% Choose the number of principal components to keep (adjust as needed)
+%numComponentsToKeep = 30;
+% Select the top principal components
+%selectedROIs = score(:, 1:numComponentsToKeep);
+
+
 % PREDICTIONS
 ALL = [ratioWO, WOpainpre, ROIs, genotype];
 %ALL(ratioWO>0.9999, :) = NaN;
@@ -47,6 +56,8 @@ varname = 'Normalised Improvement WO';
 target = ALL(:, 1);
 
 input = ALL(:, 2:end);
+
+
 %%
 % Implement SVM-based feature selection
 %options = statset('UseParallel', true);
@@ -90,7 +101,7 @@ for i = 1:numel(target)
     
     % Fit linear model with selected predictors for combined vs target
     %mdlCombined = fitlm(inputTrainSelected, targetTrain);
-    svmModelSelected = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
+    svmModelSelected = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true,  'KernelFunction', 'linear');
     predictions2(i) = predict(svmModelSelected, inputTestSelected);
     
     % Store the selected features for the current fold
