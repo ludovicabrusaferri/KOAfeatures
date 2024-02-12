@@ -23,78 +23,83 @@ WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'))
 
 % Calculate "RawChange"
 rawChangeTKA = TKApainpost - TKApainpre;
-ratioTKA = (TKApainpre-TKApainpost)./(TKApainpost + TKApainpre);
+ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre);
 
 % Calculate "RawChange"
 rawChangeWO = WOpainpost - WOpainpre;
-ratioWO = (WOpainpre-WOpainpost)./(WOpainpost + WOpainpre);
+ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre);
 
-%GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
+% GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
+% Fit linear models
+mdl = fitglm(rawChangeTKA, TKApainpre);
+rawChangeTKAadj = mdl.Residuals.Raw;
 
-mdl=fitglm(rawChangeTKA,TKApainpre);
-rawChangeTKAadj=mdl.Residuals.Raw;
-mdl=fitglm(rawChangeWO,WOpainpre);
-rawChangeWOadj=mdl.Residuals.Raw;
-%% %% ====== PREDICTIONSß ===========
+mdl = fitglm(rawChangeWO, WOpainpre);
+rawChangeWOadj = mdl.Residuals.Raw;
 
-ALL=[rawChangeTKA,rawChangeTKAadj, ratioTKA,rawChangeWO,rawChangeWOadj,ratioWO, TKApainpre,WOpainpre, ROIs, genotype];
+%% PREDICTIONS
+
+ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype];
+ALL = normvalues(ALL);
 
 % Define the pattern
 pattern = 'SC|CC';
+
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-numericTitles_sub=numericTitles(indices);
-numericTitles_sub=[numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))),numericTitles_sub,numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
 
+targetarray = ALL(:, 1:6);
+k = 6;
 
-targetarray = ALL(:,1:6);
-k =6;
-
-if k==1
+if k == 1
     varname = 'RawChange TKA';
-    input = ALL(:,7);
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-elseif k==2
+elseif k == 2
     varname = 'RawChange TKA adj';
-    input = ALL(:,7);
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-elseif k==3
+elseif k == 3
     varname = 'Normalised Improvement TKA';
-    input = ALL(:,7);
+    input = ALL(:, 7);
     predictorsCombined = ALL(:, [7, 9:end]);
-elseif k==4
+elseif k == 4
     varname = 'RawChange WO';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
-elseif k==5
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
+elseif k == 5
     varname = 'RawChange WO adj';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
-elseif k==6
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
+elseif k == 6
     varname = 'Normalised Improvement WO';
-    input = ALL(:,8);
-    predictorsCombined = ALL(:,8:end);
+    input = ALL(:, 8);
+    predictorsCombined = ALL(:, 8:end);
 end
 
-target=targetarray(:,k);
+target = targetarray(:, k);
+options = statset('UseParallel', true);
 
+optimizeFeatures = false;
 
-% Lasso regularization for feature selection
-%[BCombined, FitInfoCombined] = lasso(predictorsCombined, target); % can this be oustide the loop?
+if optimizeFeatures
+    % Optimize for the optimal number of features
+    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options);
+else
+    % Choose a fixed number of features
+    numSelectedFeatures = 20; % Choose the desired number of features
+    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
+end
 
-% Identify non-zero coefficients (selected features)
-%selectedFeatures = predictorsCombined(:, BCombined(:, 1) ~= 0);
-options = statset('UseParallel',true);
-numSelectedFeatures = 20; % Choose the desired number of features
-selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'Nfeatures', numSelectedFeatures);
-    
-% Use the selected features for modeling
 selectedFeatures = predictorsCombined(:, selectedFeaturesidx);
-selectednumericTitles_sub=numericTitles_sub(:, selectedFeaturesidx);
+
+selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+STORE = [];
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -123,11 +128,16 @@ for i = 1:numel(target)
     % Fit linear model with selected predictors for combined vs target
     mdlCombined = fitlm(predictorsCombinedTrain, targetTrain);
     predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
+    
+    % Store the selected features for the current fold
+    selectedFeaturesSTORE(selectedFeaturesidx) = 1;
+    STORE = [STORE, selectedFeaturesSTORE];
+    % Reset selectedFeaturesSTORE for the next fold
+    selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
 end
 
-
 % Plot correlations and regression lines
-figure;
+figure(1)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
 title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
@@ -144,57 +154,32 @@ ylabel('Predicted');
 xlabel('True');
 hold off;
 
+% Sum the frequencies across folds
+freq = sum(STORE, 2);
 
-%% ====== CLUSTERING =========== (let's see what to do here...)
-
-% Combine variables for clustering
-dataForClustering = [TKApainpre, rawChangeTKA];
-
-% Normalize the data between min and max
-dataForClustering = normalize(dataForClustering, 'range');
-
-% Specify the number of clusters (k=4)
-numClusters = 4;
-
-% Set the random seed for reproducibility
-rng(42);
-
-% Run k-means clustering
-[idx, centers] = kmeans(dataForClustering, numClusters);
-
-% Plot the results
-figure;
-for i = 1:numClusters
-    clusterIndices = idx == i;
-    scatter(dataForClustering(clusterIndices, 1), dataForClustering(clusterIndices, 2), 40, 'filled', 'DisplayName', ['Cluster ' num2str(i)]);
-    hold on;
-end
-
-scatter(centers(:, 1), centers(:, 2), 200, 'X', 'LineWidth', 2, 'DisplayName', 'Cluster Centers');
-
-% Add legend and labels
-legend('show');
-title('K-Means Clustering (Normalized)');
-xlabel('Normalized TKApainpre');
-ylabel('Normalized RawChange');
-set(gca, 'FontSize', 25);
-hold off;
+% Plot histogram of selected features frequencies
+figure(2);
+bar(freq);
+xlabel('Feature Index');
+ylabel('Frequency across Folds');
+title('Selected Features Frequencies over Folds');
 set(gcf, 'Color', 'w');
-%%
-%figure(22)
-%var=ROIs(:,3);
-%group=zeros(size(var,1),1);
-%rowsToKeep = idx==3|idx==1|idx==4
-%group(~rowsToKeep,:)=1;
-%pv=PlotGroupDifferenceNoCovariates(var,group,[0.2, 0.2, 0.2],'m',1,2)
-%title(sprintf('SUVR, p=%.2f',pv))
-% Define tick locations
-%xticks([1 2]);
-%xticklabels({'cluster$\sim=$4', 'cluster4'});
-%hold off
+set(gca, 'FontSize', 25);
+
+%% CLUSTER
 %%
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
     crit = mdl.RMSE;
 end
 
+function out = normvalues(input)
+    [rows, cols] = size(input);
+    out = zeros(rows, cols);
+
+    for col = 1:cols
+        % Normalize each column separately
+        colData = input(:, col);
+        out(:, col) = (colData - min(colData)) ./ (max(colData) - min(colData));
+    end
+end
