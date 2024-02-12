@@ -50,8 +50,8 @@ rawChangeWOadj = mdlWO.Residuals.Raw;
 %% PREDICTIONS
 
 % Combine relevant features for prediction
-ALL = [ratioWO, WOpainpre, ROIs, genotype];
-%sALL(ratioWO>0.9999, :) = NaN;
+ALL = [ratioWO, WOpainpre, genotype ROIs];
+%ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 
 varname = 'Normalised Improvement WO';
@@ -66,6 +66,7 @@ options = statset('UseParallel', true);
 method = "SVM"; % Specify the method
 numSelectedFeatures = 15; % Choose the desired number of features
 linearmodel = 0;
+alwaysIncludeFirst = false;
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -104,13 +105,27 @@ for i = 1:numel(target)
         selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
     elseif strcmp(method, "SVM")
         % SVM-based feature selection for regression
-        %svmModel = fitrsvm(inputTrain, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
         svmModel = fitrsvm(inputTrain, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
         featureWeights = abs(svmModel.Beta);
         [~, sortedIndices] = sort(featureWeights, 'descend');
         selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
 
-    end
+        % Check if features 1 and 2 are already selected
+        includeFeature1 = ~any(selectedFeaturesidx == 1);
+        includeFeature2 = ~any(selectedFeaturesidx == 2);
+    
+        % Update selectedFeaturesidx based on the checks
+        if alwaysIncludeFirst && includeFeature1
+            selectedFeaturesidx = [1; selectedFeaturesidx];
+        end
+        if alwaysIncludeFirst && includeFeature2
+            selectedFeaturesidx = [2; selectedFeaturesidx];
+        end
+    
+        % Include the top numSelectedFeatures - 2 features without the first two
+        selectedFeaturesidx = [selectedFeaturesidx; sortedIndices(1:numSelectedFeatures - length(selectedFeaturesidx))];
+end
+
 
     inputTrainSelected = inputTrain(:, selectedFeaturesidx);
     inputTestSelected = inputTest(:, selectedFeaturesidx);
@@ -169,7 +184,7 @@ pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
-title = ['WOMAC Pain Pre' ,numericTitles_sub,'genotype']';
+title = ['WOMAC Pain Pre' ,'genotype',numericTitles_sub]';
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
