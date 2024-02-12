@@ -2,6 +2,7 @@
 clear all;
 clc;
 rng(46);
+
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
 addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
@@ -32,44 +33,31 @@ ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre + eps);
 rawChangeWO = WOpainpost - WOpainpre;
 ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre + eps);
 
-% GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
-% Fit linear models
-mdl = fitglm(rawChangeTKA, TKApainpre); rawChangeTKAadj = mdl.Residuals.Raw;
-mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
-
-%% PREDICTIONS
-% ... (previous code)
-
 % PREDICTIONS
 ALL = [ratioWO, WOpainpre, ROIs, genotype];
 ALL = normvalues(ALL);
-
-varname = 'Normalised Improvement WO';
 target = ALL(:, 1);
 ALL(isnan(target), :) = [];
-input = ALL(:, 2);
-predictorsCombined = ALL(:, 2:end);
+varname = 'Normalised Improvement WO';
+target = ALL(:, 1);
 
-predictorsCombined = [predictorsCombined];
-
-% ... (rest of the code)
-
+input = ALL(:, 2:end);
 %%
+% Implement SVM-based feature selection
 options = statset('UseParallel', true);
-
-options = "Lasso"; % SequentialsVariable, SequentialsFixed, Lasso
 numSelectedFeatures = 25; % Choose the desired number of features
 
-selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+selectedFeaturesSTORE = zeros(size(input, 2), 1);
 STORE = [];
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
 predictions2 = zeros(1, numel(target));
+
 
 % Loop for leave-one-out cross-validation
 for i = 1:numel(target)
@@ -79,52 +67,45 @@ for i = 1:numel(target)
     targetTest = target(i);
     
     inputTrain = input;
-    inputTrain(i) = [];
-    inputTest = input(i);
+    inputTrain(i, :) = [];
+    inputTest = input(i, :);
 
-    predictorsCombinedTrain = predictorsCombined;
-    predictorsCombinedTrain(i, :) = [];
+    % SVM-based feature selection for regression
+    svmModel = fitrsvm(inputTrain, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
+    
+    % Get feature weights from the trained SVM model
+    featureWeights = abs(svmModel.Beta);
 
-    if strcmp(options,'SequentialsVariable')
-    % Optimize for the optimal number of features
-        selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options);
-    elseif strcmp(options,'SequentialsFixed')
-    % Choose a fixed number of features
-        selectedFeaturesidx = sequentialfs(@critfun, predictorsCombinedTrain, targetTrain, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
-    elseif strcmp(options,'Lasso')
-        % L1 regularization (LASSO) for feature selection
-        [B, FitInfo] = lasso(predictorsCombinedTrain, targetTrain, 'CV', 20); % You can adjust 'CV' as needed
-        idxLambdaMinMSE = FitInfo.IndexMinMSE;
-        selectedFeaturesidx = B(:, idxLambdaMinMSE) ~= 0;
-    end
+    % Sort features based on weights and select the top ones
+    [~, sortedIndices] = sort(featureWeights, 'descend');
+    selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
 
-
-    predictorsCombinedTrain = predictorsCombinedTrain(:, selectedFeaturesidx);
-    predictorsCombinedTest = predictorsCombined(i, selectedFeaturesidx);
+    inputTrainSelected = inputTrain(:, selectedFeaturesidx);
+    inputTestSelected = inputTest(:, selectedFeaturesidx);
 
     % Fit linear model with selected predictors for input vs target
-    mdl1 = fitlm(inputTrain, targetTrain);
-    predictions1(i) = predict(mdl1, inputTest);
+    mdl1 = fitlm(inputTrain(:,1), targetTrain);
+    predictions1(i) = predict(mdl1, inputTest(1));
     
     % Fit linear model with selected predictors for combined vs target
-    mdlCombined = fitlm(predictorsCombinedTrain, targetTrain);
-    predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
+    %mdlCombined = fitlm(inputTrainSelected, targetTrain);
+    svmModelSelected = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true, 'KernelFunction', 'linear');
+    predictions2(i) = predict(svmModelSelected, inputTestSelected);
     
     % Store the selected features for the current fold
     selectedFeaturesSTORE(selectedFeaturesidx) = 1;
     STORE = [STORE, selectedFeaturesSTORE];
     % Reset selectedFeaturesSTORE for the next fold
-    selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+    selectedFeaturesSTORE = zeros(size(input, 2), 1);
     fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
 end
-%%
+
 % Plot correlations and regression lines
-figure(1)
+figure(3)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
-title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
+title({"Model: PainPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
-xlim([0,1])
 
 ylabel('Predicted');
 xlabel('True');
@@ -132,24 +113,23 @@ hold off;
 
 subplot(1, 2, 2);
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target, predictions2', 30, 'b');
-title({"Model: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+title({"Model: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 hold off;
-xlim([0,1])
+
 % Sum the frequencies across folds
 freq = sum(STORE, 2);
 
 % Plot histogram of selected features frequencies
-figure(2);
+figure(4);
 bar(freq);
 xlabel('Feature Index');
 ylabel('Frequency across Folds');
-title('Selected Features Frequencies over Folds');
+title('Selected Features Frequencies over Iterations');
 set(gcf, 'Color', 'w');
 set(gca, 'FontSize', 25);
 
-%% CLUSTER
 %%
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
