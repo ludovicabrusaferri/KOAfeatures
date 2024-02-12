@@ -42,54 +42,23 @@ mdl = fitglm(rawChangeTKA, TKApainpre); rawChangeTKAadj = mdl.Residuals.Raw;
 mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
 
 %% PREDICTIONS
+% ... (previous code)
 
-ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype,ROIs.*WOpainpre,WOpainpre.*genotype, ROIs.*genotype];
-%ALL(ratioWO>0.9999, :) = NaN;
+% PREDICTIONS
+ALL = [ratioWO, WOpainpre, ROIs, genotype];
 ALL = normvalues(ALL);
 
-% Define the pattern
-pattern = 'SC|CC';
+varname = 'Normalised Improvement WO';
+target = ALL(:, 1);
+ALL(isnan(target), :) = [];
+input = ALL(:, 2);
+predictorsCombined = ALL(:, 2:end);
 
-% Use regexp to find indices where the numericTitles match the pattern
-indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-%numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+predictorsCombined = [predictorsCombined];
 
-k = 6;
+% ... (rest of the code)
 
-if k == 1
-    varname = 'RawChange TKA';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 2
-    varname = 'RawChange TKA adj';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 3
-    varname = 'Normalised Improvement TKA';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 4
-    varname = 'RawChange WO';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-elseif k == 5
-    varname = 'RawChange WO adj';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-elseif k == 6
-    varname = 'Normalised Improvement WO';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-end
-
-target = ALL(:, k);
-
+%%
 options = statset('UseParallel', true);
 
 options = "Lasso"; % SequentialsVariable, SequentialsFixed, Lasso
