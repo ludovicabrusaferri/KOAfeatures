@@ -51,6 +51,7 @@ rawChangeWOadj = mdlWO.Residuals.Raw;
 
 % Combine relevant features for prediction
 ALL = [ratioWO, WOpainpre, ROIs, genotype];
+%sALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 
 varname = 'Normalised Improvement WO';
@@ -63,7 +64,7 @@ target = ALL(:, 1);
 % Set options for feature selection
 options = statset('UseParallel', true);
 method = "SVM"; % Specify the method
-numSelectedFeatures = 20; % Choose the desired number of features
+numSelectedFeatures = 15; % Choose the desired number of features
 linearmodel = 0;
 
 % Initialize result containers
@@ -119,8 +120,13 @@ for i = 1:numel(target)
     % Fit linear model or SVM with selected predictors for combined vs target
     if linearmodel
         mdlCombined = fitlm(inputTrainSelected, targetTrain);
+        %mdlCombined = fitrlinear(inputTrainSelected, targetTrain, 'Regularization', 'ridge', 'Lambda', 'auto');
+
     else
-        mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true,  'KernelFunction', 'linear');
+        %mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true,  'KernelFunction', 'linear');
+        mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'KernelFunction','linear','KernelScale','auto', 'Standardize',true);
+
+
     end
     
     predictions2(i) = predict(mdlCombined, inputTestSelected);
@@ -139,17 +145,21 @@ end
 figure(1)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
-title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
+title({"Model: PainPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1])
+ylim([0,1.5])
+hold off
 
 subplot(1, 2, 2);
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target, predictions2', 30, 'b');
-title({"Model: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+title({"Model: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1])
+ylim([0,1.5])
+hold off
 
 % Sum the frequencies across folds for selected features
 freq = sum(STORE, 2);
