@@ -135,14 +135,54 @@ hold off;
 % Sum the frequencies across folds
 freq = sum(STORE, 2);
 
-% Plot histogram of selected features frequencies
-figure(4);
-bar(freq);
-xlabel('Feature Index');
-ylabel('Frequency across Folds');
-title('Selected Features Frequencies over Folds');
+%%
+% Sum the frequencies across folds for selected features
+freq = sum(STORE, 2);
+
+pattern = 'SC|CC';
+% Use regexp to find indices where the numericTitles match the pattern
+indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
+numericTitles_sub = numericTitles(indices);
+title = ['WOMAC Pain Pre' ,numericTitles_sub,'genotype']';
+
+% Convert freq to a cell array
+freqCell = num2cell(freq);
+
+% Concatenate freqCell and title
+combinedData = [freqCell, title];
+
+% Sort based on the first column (freq) in descending order
+sortedData = sortrows(combinedData, -1);
+
+% Extract the sorted freq and title
+sortedFreq = cell2mat(sortedData(:, 1));
+sortedTitle = sortedData(:, 2);
+% Plot the histogram using the histogram function
+% Plot the histogram
+% Convert the cell array of titles to a cell array of strings
+sortedTitleStrings = cellfun(@str2mat, sortedTitle, 'UniformOutput', false);
+
+% Plot the histogram using the histogram function
+figure(2)
+bar(sortedFreq);
+
+% Set the x-axis labels to be the sorted titles
+xticks(1:length(sortedFreq));
+xticklabels(sortedTitleStrings);
+
+% Rotate x-axis labels for better visibility
+xtickangle(45);
+
+% Set axis labels and title
+xlabel('Titles');
+ylabel('Frequency');
+%title('Histogram of Sorted Data');
 set(gcf, 'Color', 'w');
-set(gca, 'FontSize', 25);
+set(gca,'FontSize',15)
+
+% Display the plot
+grid on;
+
 
 %% CLUSTER
 %%
