@@ -1,7 +1,7 @@
 % Clear workspace and command window
 clear all;
 clc;
-
+rng(46);
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
 addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
@@ -20,6 +20,8 @@ TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
+Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
+WOphyspre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (physical function)'));
 
 eps = 0.00000000001;
 % Calculate "RawChange"
@@ -40,53 +42,23 @@ mdl = fitglm(rawChangeTKA, TKApainpre); rawChangeTKAadj = mdl.Residuals.Raw;
 mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
 
 %% PREDICTIONS
+% ... (previous code)
 
-ALL = [rawChangeTKA, rawChangeTKAadj, ratioTKA, rawChangeWO, rawChangeWOadj, ratioWO, TKApainpre, WOpainpre, ROIs, genotype];
-%ALL(ratioWO>0.9999, :) = NaN;
+% PREDICTIONS
+ALL = [ratioWO, WOpainpre, ROIs, genotype];
 ALL = normvalues(ALL);
 
-% Define the pattern
-pattern = 'SC|CC';
+varname = 'Normalised Improvement WO';
+target = ALL(:, 1);
+ALL(isnan(target), :) = [];
+input = ALL(:, 2);
+predictorsCombined = ALL(:, 2:end);
 
-% Use regexp to find indices where the numericTitles match the pattern
-indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-%numericTitles_sub = [numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'painpre')))), numericTitles(indices), numericTitles(find(~cellfun('isempty', regexp(numericTitles, 'Genotype'))))];
+predictorsCombined = [predictorsCombined];
 
-k = 6;
+% ... (rest of the code)
 
-if k == 1
-    varname = 'RawChange TKA';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 2
-    varname = 'RawChange TKA adj';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 3
-    varname = 'Normalised Improvement TKA';
-    ALL(isnan(ALL(:, 1)), :) = [];
-    input = ALL(:, 7);
-    predictorsCombined = ALL(:, [7, 9:end]);
-elseif k == 4
-    varname = 'RawChange WO';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-elseif k == 5
-    varname = 'RawChange WO adj';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-elseif k == 6
-    varname = 'Normalised Improvement WO';
-    ALL(isnan(ALL(:, 4)), :) = [];
-    input = ALL(:, 8);
-    predictorsCombined = ALL(:, 8:end);
-end
-
-target = ALL(:, k);
+%%
 options = statset('UseParallel', true);
 
 optimizeFeatures = false;
@@ -96,7 +68,7 @@ if optimizeFeatures
     selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options);
 else
     % Choose a fixed number of features
-    numSelectedFeatures = 20; % Choose the desired number of features
+    numSelectedFeatures = 30; % Choose the desired number of features
     selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
 end
 
@@ -146,7 +118,7 @@ end
 figure(3)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
-title({"Model: TkaPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
+title({"Model: PainPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
 
 ylabel('Predicted');
@@ -155,7 +127,7 @@ hold off;
 
 subplot(1, 2, 2);
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target, predictions2', 30, 'b');
-title({"Model: [TkaPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+title({"Model: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 hold off;
