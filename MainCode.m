@@ -134,6 +134,8 @@ for i = 1:numel(target)
     STORE = [STORE, selectedFeaturesSTORE];
     % Reset selectedFeaturesSTORE for the next fold
     selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
+
+    fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
 end
 
 % Plot correlations and regression lines
