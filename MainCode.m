@@ -63,10 +63,8 @@ target = ALL(:, 1);
 
 % Set options for feature selection
 options = statset('UseParallel', true);
-method = "SequentialsFixed"; % Specify the method
-numSelectedFeatures = 30; % Choose the desired number of features
-linearmodel = 1;
 alwaysIncludeFirst = false;
+selectOutside = true;
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -74,48 +72,12 @@ predictions2 = zeros(1, numel(target));
 selectedFeaturesSTORE = zeros(size(input, 2), 1);
 STORE = [];
 
-
-    % Feature selection based on the chosen method
-    if strcmp(method, 'SequentialsVariable')
-        % Optimize for the optimal number of features
-        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options);
-    elseif strcmp(method, 'SequentialsFixed')
-        % Choose a fixed number of features
-        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
-    elseif strcmp(method, 'Lasso')
-        % L1 regularization (LASSO) for feature selection
-        [B, FitInfo] = lasso(iinput, target, 'CV', 20); % You can adjust 'CV' as needed
-        idxLambdaMinMSE = FitInfo.IndexMinMSE;
-        selectedFeaturesidx = B(:, idxLambdaMinMSE) ~= 0;
-    elseif strcmp(method, 'RandomForest')
-        % Train Random Forest with OOBPermuteVarDeltaError
-        numTrees = 30; % You can adjust the number of trees
-        baggedTree = TreeBagger(numTrees, input, target, 'Method', 'regression', 'OOBPredictorImportance', 'on');
-        importance = baggedTree.OOBPermutedVarDeltaError;
-        [~, sortedIdx] = sort(importance, 'descend');
-        selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
-    elseif strcmp(method, "SVM")
-        % SVM-based feature selection for regression
-        svmModel = fitrsvm(input, target, 'KernelFunction','linear','Standardize',true);
-        featureWeights = abs(svmModel.Beta);
-        [~, sortedIndices] = sort(featureWeights, 'descend');
-        selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
-
-        % Check if features 1 and 2 are already selected
-        includeFeature1 = ~any(selectedFeaturesidx == 1);
-        includeFeature2 = ~any(selectedFeaturesidx == 2);
-    
-        % Update selectedFeaturesidx based on the checks
-        if alwaysIncludeFirst && includeFeature1
-            selectedFeaturesidx = [1; selectedFeaturesidx];
-        end
-        if alwaysIncludeFirst && includeFeature2
-            selectedFeaturesidx = [2; selectedFeaturesidx];
-        end
-    
-        % Include the top numSelectedFeatures - 2 features without the first two
-        selectedFeaturesidx = [selectedFeaturesidx; sortedIndices(1:numSelectedFeatures - length(selectedFeaturesidx))];
-    end
+if selectOutside
+    method = "SequentialsFixed"; % Specify the method
+    linearmodel = true;
+    numSelectedFeatures = 30; % Choose the desired number of features
+    selectedFeaturesidx = selectedFeatures(input, target, method, numSelectedFeatures, options, alwaysIncludeFirst);   
+end
 
 for i = 1:numel(target)
     % Create training and testing sets
@@ -127,8 +89,18 @@ for i = 1:numel(target)
     inputTrain(i, :) = [];
     inputTest = input(i, :);
 
-    inputTrainSelected = inputTrain(:, selectedFeaturesidx);
-    inputTestSelected = inputTest(:, selectedFeaturesidx);
+    if selectOutside
+        inputTrainSelected = inputTrain(:, selectedFeaturesidx);
+        inputTestSelected = inputTest(:, selectedFeaturesidx);
+    
+    else
+        method = "SVM"; % Specify the method
+        linearmodel = false;
+        numSelectedFeatures = 15; % Choose the desired number of features
+        selectedFeaturesidx = selectedFeatures(inputTrain, targetTrain, method, numSelectedFeatures, options, alwaysIncludeFirst);   
+        inputTrainSelected = inputTrain(:, selectedFeaturesidx);
+        inputTestSelected = inputTest(:, selectedFeaturesidx);
+    end
 
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain(:, 1), targetTrain);
@@ -241,5 +213,50 @@ function out = normvalues(input)
         % Normalize each column separately
         colData = input(:, col);
         out(:, col) = (colData - min(colData)) ./ (max(colData) - min(colData));
+    end
+end
+
+
+function selectedFeaturesidx = selectedFeatures(input, target, method, numSelectedFeatures, options, alwaysIncludeFirst)
+% Feature selection based on the chosen method
+    if strcmp(method, 'SequentialsVariable')
+        % Optimize for the optimal number of features
+        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options);
+    elseif strcmp(method, 'SequentialsFixed')
+        % Choose a fixed number of features
+        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
+    elseif strcmp(method, 'Lasso')
+        % L1 regularization (LASSO) for feature selection
+        [B, FitInfo] = lasso(iinput, target, 'CV', 20); % You can adjust 'CV' as needed
+        idxLambdaMinMSE = FitInfo.IndexMinMSE;
+        selectedFeaturesidx = B(:, idxLambdaMinMSE) ~= 0;
+    elseif strcmp(method, 'RandomForest')
+        % Train Random Forest with OOBPermuteVarDeltaError
+        numTrees = 30; % You can adjust the number of trees
+        baggedTree = TreeBagger(numTrees, input, target, 'Method', 'regression', 'OOBPredictorImportance', 'on');
+        importance = baggedTree.OOBPermutedVarDeltaError;
+        [~, sortedIdx] = sort(importance, 'descend');
+        selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
+    elseif strcmp(method, "SVM")
+        % SVM-based feature selection for regression
+        svmModel = fitrsvm(input, target, 'KernelFunction','linear','Standardize',true);
+        featureWeights = abs(svmModel.Beta);
+        [~, sortedIndices] = sort(featureWeights, 'descend');
+        selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
+
+        % Check if features 1 and 2 are already selected
+        includeFeature1 = ~any(selectedFeaturesidx == 1);
+        includeFeature2 = ~any(selectedFeaturesidx == 2);
+    
+        % Update selectedFeaturesidx based on the checks
+        if alwaysIncludeFirst && includeFeature1
+            selectedFeaturesidx = [1; selectedFeaturesidx];
+        end
+        if alwaysIncludeFirst && includeFeature2
+            selectedFeaturesidx = [2; selectedFeaturesidx];
+        end
+    
+        % Include the top numSelectedFeatures - 2 features without the first two
+        selectedFeaturesidx = [selectedFeaturesidx; sortedIndices(1:numSelectedFeatures - length(selectedFeaturesidx))];
     end
 end
