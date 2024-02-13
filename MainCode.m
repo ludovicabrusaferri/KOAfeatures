@@ -1,7 +1,8 @@
 % Clear workspace and command window
 clear all;
 clc;
-rng(46);
+rng(42);
+
 % Set the data file path
 dataFilePath = '/Users/e410377/Desktop/KOAfeatures/FINALWOMAC.xlsx';
 addpath(genpath('/Users/e410377/Desktop/PETAnalysisPaper/utility'));
@@ -23,65 +24,99 @@ WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'))
 Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
 WOphyspre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (physical function)'));
 
+% Small epsilon value for numerical stability
 eps = 0.00000000001;
-% Calculate "RawChange"
+
+% Calculate "RawChange" and corresponding ratio for TKA
 rawChangeTKA = TKApainpost - TKApainpre;
 ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre + eps);
 
-% Calculate "RawChange"
+% Calculate "RawChange" and corresponding ratio for WOMAC
 rawChangeWO = WOpainpost - WOpainpre;
 ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre + eps);
 
-% GM2 = numericData(:, strcmp(numericTitles, 'GM2'));
+% Extract SC and CC variables for further analysis
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
-% Fit linear models
-mdl = fitglm(rawChangeTKA, TKApainpre); rawChangeTKAadj = mdl.Residuals.Raw;
-mdl = fitglm(rawChangeWO, WOpainpre); rawChangeWOadj = mdl.Residuals.Raw;
+% Fit linear models for TKA and WOMAC
+mdlTKA = fitglm(rawChangeTKA, TKApainpre);
+rawChangeTKAadj = mdlTKA.Residuals.Raw;
+
+mdlWO = fitglm(rawChangeWO, WOpainpre);
+rawChangeWOadj = mdlWO.Residuals.Raw;
 
 %% PREDICTIONS
-% ... (previous code)
 
-% PREDICTIONS
-ALL = [ratioWO, WOpainpre, genotype, ROIs];
+% Combine relevant features for prediction
+ALL = [ratioWO, WOpainpre, genotype ROIs];
+%ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
 
 varname = 'Normalised Improvement WO';
+
+% Remove rows with NaN values
+ALL(isnan(ALL(:, 1)), :) = [];
+input = ALL(:, 2:end);
 target = ALL(:, 1);
-ALL(isnan(target), :) = [];
-input = ALL(:, 2);
-predictorsCombined = ALL(:, 2:end);
 
-predictorsCombined = [predictorsCombined];
-
-% ... (rest of the code)
-
-%%
+% Set options for feature selection
 options = statset('UseParallel', true);
-
-optimizeFeatures = false;
-
-if optimizeFeatures
-    % Optimize for the optimal number of features
-    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options);
-else
-    % Choose a fixed number of features
-    numSelectedFeatures = 30; % Choose the desired number of features
-    selectedFeaturesidx = sequentialfs(@critfun, predictorsCombined, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
-end
-
-selectedFeatures = predictorsCombined(:, selectedFeaturesidx);
-
-selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
-STORE = [];
+method = "SequentialsFixed"; % Specify the method
+numSelectedFeatures = 30; % Choose the desired number of features
+linearmodel = 1;
+alwaysIncludeFirst = false;
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
 predictions2 = zeros(1, numel(target));
+selectedFeaturesSTORE = zeros(size(input, 2), 1);
+STORE = [];
 
-% Loop for leave-one-out cross-validation
+
+    % Feature selection based on the chosen method
+    if strcmp(method, 'SequentialsVariable')
+        % Optimize for the optimal number of features
+        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options);
+    elseif strcmp(method, 'SequentialsFixed')
+        % Choose a fixed number of features
+        selectedFeaturesidx = sequentialfs(@critfun, input, target, 'cv', 'none', 'options', options, 'NFeatures', numSelectedFeatures);
+    elseif strcmp(method, 'Lasso')
+        % L1 regularization (LASSO) for feature selection
+        [B, FitInfo] = lasso(iinput, target, 'CV', 20); % You can adjust 'CV' as needed
+        idxLambdaMinMSE = FitInfo.IndexMinMSE;
+        selectedFeaturesidx = B(:, idxLambdaMinMSE) ~= 0;
+    elseif strcmp(method, 'RandomForest')
+        % Train Random Forest with OOBPermuteVarDeltaError
+        numTrees = 30; % You can adjust the number of trees
+        baggedTree = TreeBagger(numTrees, input, target, 'Method', 'regression', 'OOBPredictorImportance', 'on');
+        importance = baggedTree.OOBPermutedVarDeltaError;
+        [~, sortedIdx] = sort(importance, 'descend');
+        selectedFeaturesidx = sortedIdx(1:numSelectedFeatures);
+    elseif strcmp(method, "SVM")
+        % SVM-based feature selection for regression
+        svmModel = fitrsvm(input, target, 'KernelFunction','linear','Standardize',true);
+        featureWeights = abs(svmModel.Beta);
+        [~, sortedIndices] = sort(featureWeights, 'descend');
+        selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
+
+        % Check if features 1 and 2 are already selected
+        includeFeature1 = ~any(selectedFeaturesidx == 1);
+        includeFeature2 = ~any(selectedFeaturesidx == 2);
+    
+        % Update selectedFeaturesidx based on the checks
+        if alwaysIncludeFirst && includeFeature1
+            selectedFeaturesidx = [1; selectedFeaturesidx];
+        end
+        if alwaysIncludeFirst && includeFeature2
+            selectedFeaturesidx = [2; selectedFeaturesidx];
+        end
+    
+        % Include the top numSelectedFeatures - 2 features without the first two
+        selectedFeaturesidx = [selectedFeaturesidx; sortedIndices(1:numSelectedFeatures - length(selectedFeaturesidx))];
+    end
+
 for i = 1:numel(target)
     % Create training and testing sets
     targetTrain = target;
@@ -89,51 +124,57 @@ for i = 1:numel(target)
     targetTest = target(i);
     
     inputTrain = input;
-    inputTrain(i) = [];
-    inputTest = input(i);
+    inputTrain(i, :) = [];
+    inputTest = input(i, :);
 
-    predictorsCombinedTrain = selectedFeatures;
-    predictorsCombinedTrain(i, :) = [];
-    
-    predictorsCombinedTest = selectedFeatures(i, :);
+    inputTrainSelected = inputTrain(:, selectedFeaturesidx);
+    inputTestSelected = inputTest(:, selectedFeaturesidx);
 
     % Fit linear model with selected predictors for input vs target
-    mdl1 = fitlm(inputTrain, targetTrain);
-    predictions1(i) = predict(mdl1, inputTest);
+    mdl1 = fitlm(inputTrain(:, 1), targetTrain);
+    predictions1(i) = predict(mdl1, inputTest(1));
+    
+    % Fit linear model or SVM with selected predictors for combined vs target
+    if linearmodel
+        mdlCombined = fitlm(inputTrainSelected, targetTrain);
+        %mdlCombined = fitrlinear(inputTrainSelected, targetTrain, 'Regularization', 'ridge', 'Lambda', 'auto');
 
-    % Fit linear model with selected predictors for combined vs target
-    mdlCombined = fitlm(predictorsCombinedTrain, targetTrain);
-    predictions2(i) = predict(mdlCombined, predictorsCombinedTest);
+    else
+        %mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'Standardize', true,  'KernelFunction', 'linear');
+        mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'KernelFunction','linear', 'Standardize',true);
+    end
+    
+    predictions2(i) = predict(mdlCombined, inputTestSelected);
     
     % Store the selected features for the current fold
     selectedFeaturesSTORE(selectedFeaturesidx) = 1;
     STORE = [STORE, selectedFeaturesSTORE];
     % Reset selectedFeaturesSTORE for the next fold
-    selectedFeaturesSTORE = zeros(size(predictorsCombined, 2), 1);
-
+    selectedFeaturesSTORE = zeros(size(input, 2), 1);
     fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
 end
 
-% Plot correlations and regression lines
-figure(3)
+%% PLOT RESULTS
+
+% Plot correlations and regression lines for input vs target and combined vs target
+figure(1)
 subplot(1, 2, 1);
 [rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
 title({"Model: PainPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
-
-ylabel('Predicted');
 xlabel('True');
-hold off;
+xlim([0,1])
+ylim([0,1.5])
+hold off
 
 subplot(1, 2, 2);
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target, predictions2', 30, 'b');
 title({"Model: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
-hold off;
-
-% Sum the frequencies across folds
-freq = sum(STORE, 2);
+xlim([0,1])
+ylim([0,1.5])
+hold off
 
 %%
 % Sum the frequencies across folds for selected features
@@ -143,7 +184,7 @@ pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
-title = ['WOMAC Pain Pre','genotype' ,numericTitles_sub]';
+title = ['WOMAC Pain Pre' ,'genotype',numericTitles_sub]';
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
@@ -183,8 +224,9 @@ set(gca,'FontSize',15)
 % Display the plot
 grid on;
 
-
 %% CLUSTER
+
+
 %%
 function crit = critfun(x, y)
     mdl = fitlm(x, y);
