@@ -17,45 +17,49 @@ numericTitles = data.textdata(1, 2:end);
 % Extract relevant variables
 age = numericData(:, strcmp(numericTitles, 'Age (pre)'));
 genotype = numericData(:, strcmp(numericTitles, 'Genotype (1=GG)'));
+sex = numericData(:, strcmp(numericTitles, 'Sex (1=F)'));
 TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
-WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
-Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
 WOphyspre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (physical function)'));
+WOstyffpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (stiffness)'));
+WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
+WOphyspost = numericData(:, strcmp(numericTitles, '1yr POST-TKA,Womac (phys func)'));
+WOstyffpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA,Womac (stiffness)'));
+WOtotpre = WOpainpre +WOphyspre + WOstyffpre;
+WOtotpost = WOpainpost +WOphyspost + WOstyffpost;
+
+Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
+
 
 % Small epsilon value for numerical stability
 eps = 0.00000000001;
 
 % Calculate "RawChange" and corresponding ratio for TKA
 rawChangeTKA = TKApainpost - TKApainpre;
-ratioTKA = (TKApainpre - TKApainpost) ./ (TKApainpost + TKApainpre + eps);
-
 % Calculate "RawChange" and corresponding ratio for WOMAC
 rawChangeWO = WOpainpost - WOpainpre;
-ratioWO = (WOpainpre - WOpainpost) ./ (WOpainpost + WOpainpre + eps);
+
+ratioTKA = ratioimpr(TKApainpre,TKApainpost,eps);
+ratioWOpain = ratioimpr(WOpainpre,WOpainpost,eps);
+ratioWOstyff = ratioimpr(WOstyffpre,WOstyffpost,eps);
+ratioWOphys = ratioimpr(WOphyspre,WOphyspost,eps);
+ratioWOtot = ratioimpr(WOtotpre,WOtotpost,eps);
 
 % Extract SC and CC variables for further analysis
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
 ROIs = cat(2, SC, CC);
 
-% Fit linear models for TKA and WOMAC
-mdlTKA = fitglm(rawChangeTKA, TKApainpre);
-rawChangeTKAadj = mdlTKA.Residuals.Raw;
 
-mdlWO = fitglm(rawChangeWO, WOpainpre);
-rawChangeWOadj = mdlWO.Residuals.Raw;
 
 %% PREDICTIONS
 
-% Combine relevant features for prediction
-ALL = [ratioWO, WOpainpre, genotype ROIs];
-%ALL(ratioWO>0.9999, :) = NaN;
-ALL = normvalues(ALL);
-%ALL = standardizeValues(ALL);
-varname = 'Normalised Improvement WO';
 
+ALL = [(ratioWOpain),WOpainpre,genotype,sex,ROIs];
+ALL = normvalues(ALL);
+varname = 'Norm. Impr';
+inputname = 'WOtotpre';
 % Remove rows with NaN values
 ALL(isnan(ALL(:, 1)), :) = [];
 input = ALL(:, 2:end);
@@ -75,6 +79,8 @@ predictions1 = zeros(1, numel(target));
 predictedTarget = zeros(1, numel(target));
 
 numFolds =numel(predictions1);
+selectedFeaturesSTORE = zeros(size(input, 2), 1);
+STORE = [];
 
 % Leave-one-out cross-validation loop
 for fold = randperm(numFolds)
@@ -90,7 +96,7 @@ for fold = randperm(numFolds)
     inputTest = input(testIndices, :);
    
     % Feature selection using RFE with SVM
-    mdl = fitrsvm(inputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true, 'BoxConstraint', 1);
+    mdl = fitrsvm(inputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
     featureWeights = abs(mdl.Beta);
     [~, sortedIndices] = sort(featureWeights, 'descend');
     selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
@@ -98,7 +104,6 @@ for fold = randperm(numFolds)
     % Train the final model using selected features
     selectedInputTrain = inputTrain(:, selectedFeaturesidx);
     selectedInputTest = inputTest(:, selectedFeaturesidx);
-    
     
     finalModel = fitrsvm(selectedInputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
 
@@ -111,6 +116,12 @@ for fold = randperm(numFolds)
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain(:, 1), targetTrain);
     predictions1(testIndices) = predict(mdl1, inputTest(1));
+
+    selectedFeaturesSTORE(selectedFeaturesidx) = 1;
+    STORE = [STORE, selectedFeaturesSTORE];
+    % Reset selectedFeaturesSTORE for the next fold
+    selectedFeaturesSTORE = zeros(size(input, 2), 1);
+    fprintf('Progress: %.2f%%\n', 100 * testIndices / numel(target));
 end
 
 %%
@@ -120,27 +131,67 @@ subplot(1,3,1)
 title({"Model: [PainPre]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
-xlim([0,1])
-ylim([0.1,1.5])
+xlim([0,1.3])
+ylim([0,1.3])
 hold off
 subplot(1,3,2)
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictedTarget', 30, 'b');
 title({"Model: [PainPre, ROIs, geno]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
-xlim([0,1])
-ylim([0.1,1.5])
+xlim([0,1.3])
+ylim([0,1.3])
 hold off
 
-subplot(1,3,3)
-[rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, predict(finalModel, selectedInputTrain), 30, [0.5 0.5 0.5]);
-title({"Train: [PainPre, ROIs, geno]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-ylabel('Predicted');
-xlabel('True');
-xlim([0,1])
-ylim([0.1,1.5])
-hold off
 
+%% FREQ
+
+% Sum the frequencies across folds for selected features
+freq = sum(STORE, 2);
+
+pattern = 'SC|CC';
+% Use regexp to find indices where the numericTitles match the pattern
+indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
+numericTitles_sub = numericTitles(indices);
+titlen = [inputname,'genotype','sex',numericTitles_sub]';
+
+% Convert freq to a cell array
+freqCell = num2cell(freq);
+
+% Concatenate freqCell and title
+combinedData = [freqCell, titlen];
+
+% Sort based on the first column (freq) in descending order
+sortedData = sortrows(combinedData, -1);
+
+% Extract the sorted freq and title
+sortedFreq = cell2mat(sortedData(:, 1));
+sortedTitle = sortedData(:, 2);
+% Plot the histogram using the histogram function
+% Plot the histogram
+% Convert the cell array of titles to a cell array of strings
+sortedTitleStrings = cellfun(@str2mat, sortedTitle, 'UniformOutput', false);
+
+% Plot the histogram using the histogram function
+figure(3)
+bar(sortedFreq);
+
+% Set the x-axis labels to be the sorted titles
+xticks(1:length(sortedFreq));
+xticklabels(sortedTitleStrings);
+
+% Rotate x-axis labels for better visibility
+xtickangle(45);
+
+% Set axis labels and title
+xlabel('Titles');
+ylabel('Frequency');
+%title('Histogram of Sorted Data');
+set(gcf, 'Color', 'w');
+set(gca,'FontSize',15)
+
+% Display the plot
+grid on;
 
 %%
 % Feature selection criterion function for RFE
@@ -160,3 +211,8 @@ function out = normvalues(input)
         out(:, col) = (colData - min(colData)) ./ (max(colData) - min(colData));
     end
 end
+
+function ratio = ratioimpr(pre, post, eps)
+    ratio = (pre - post) ./ (post + pre + eps);
+end
+
