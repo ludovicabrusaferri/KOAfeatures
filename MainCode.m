@@ -53,7 +53,7 @@ rawChangeWOadj = mdlWO.Residuals.Raw;
 ALL = [ratioWO, WOpainpre, genotype ROIs];
 %ALL(ratioWO>0.9999, :) = NaN;
 ALL = normvalues(ALL);
-
+%ALL = standardizeValues(ALL);
 varname = 'Normalised Improvement WO';
 
 % Remove rows with NaN values
@@ -80,7 +80,7 @@ if selectOutside
 end
 
 % Set the number of folds
-numFolds = 11;
+numFolds = 41;
 
 for fold = randperm(numFolds)
     % Calculate the indices for training and testing sets
@@ -133,26 +133,40 @@ end
 
 %% PLOT RESULTS
 
+close;
+figure(11)
+[rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, predict(mdlCombined, inputTrainSelected), 30, 'b');
+title({"Training: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+ylabel('Predicted');
+xlabel('True');
+xlim([0,1])
+ylim([0.0,1.5])
+hold off
+
+
+%%
+%% PLOT RESULTS
+
+close all
 % Plot correlations and regression lines for input vs target and combined vs target
 figure(1)
 subplot(1, 2, 1);
-[rho1, p1] = PlotSimpleCorrelationWithRegression(target, predictions1', 30, 'b');
+[rho1, p1] = PlotSimpleCorrelationWithRegression(target,  predictions1', 30, 'b');
 title({"Model: PainPre vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho1, p1)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1])
-ylim([0,1.5])
+ylim([0.3,1.5])
 hold off
 
 subplot(1, 2, 2);
-[rho2, p2] = PlotSimpleCorrelationWithRegression(target, predictions2', 30, 'b');
+[rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictions2', 30, 'b');
 title({"Model: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1])
-ylim([0,1.5])
+ylim([0.3,1.5])
 hold off
-
 %%
 % Sum the frequencies across folds for selected features
 freq = sum(STORE, 2);
@@ -220,6 +234,27 @@ function out = normvalues(input)
         out(:, col) = (colData - min(colData)) ./ (max(colData) - min(colData));
     end
 end
+
+function out = standardizeValues(input)
+    [rows, cols] = size(input);
+    out = zeros(rows, cols);
+
+    for col = 1:cols
+        % Standardize each column separately using zscore, ignoring NaN values
+        colData = input(:, col);
+        nonNaNIndices = ~isnan(colData);
+        
+        if any(nonNaNIndices)
+            % Only standardize if there are non-NaN values in the column
+            out(nonNaNIndices, col) = zscore(colData(nonNaNIndices));
+        else
+            % If all values in the column are NaN, leave them as they are
+            out(:, col) = colData;
+        end
+    end
+end
+
+
 
 
 function selectedFeaturesidx = selectedFeatures(input, target, method, numSelectedFeatures, options, alwaysIncludeFirst)
