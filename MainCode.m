@@ -80,9 +80,9 @@ if selectOutside
 end
 
 % Set the number of folds
-numFolds = 41;
+numFolds = 11;
 
-for fold = 1:numFolds
+for fold = randperm(numFolds)
     % Calculate the indices for training and testing sets
     testIndices = round((fold - 1) * numel(target) / numFolds + 1 : fold * numel(target) / numFolds);
     trainIndices = setdiff(1:numel(target), testIndices);
