@@ -64,7 +64,7 @@ target = ALL(:, 1);
 % Set options for feature selection
 options = statset('UseParallel', true);
 alwaysIncludeFirst = false;
-selectOutside = true;
+selectOutside = false;
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -79,15 +79,20 @@ if selectOutside
     selectedFeaturesidx = selectedFeatures(input, target, method, numSelectedFeatures, options, alwaysIncludeFirst);   
 end
 
-for i = 1:numel(target)
+% Set the number of folds
+numFolds = 41;
+
+for fold = 1:numFolds
+    % Calculate the indices for training and testing sets
+    testIndices = round((fold - 1) * numel(target) / numFolds + 1 : fold * numel(target) / numFolds);
+    trainIndices = setdiff(1:numel(target), testIndices);
+
     % Create training and testing sets
-    targetTrain = target;
-    targetTrain(i) = [];
-    targetTest = target(i);
+    targetTrain = target(trainIndices);
+    targetTest = target(testIndices);
     
-    inputTrain = input;
-    inputTrain(i, :) = [];
-    inputTest = input(i, :);
+    inputTrain = input(trainIndices, :);
+    inputTest = input(testIndices, :);
 
     if selectOutside
         inputTrainSelected = inputTrain(:, selectedFeaturesidx);
@@ -104,7 +109,7 @@ for i = 1:numel(target)
 
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain(:, 1), targetTrain);
-    predictions1(i) = predict(mdl1, inputTest(1));
+    predictions1(testIndices) = predict(mdl1, inputTest(1));
     
     % Fit linear model or SVM with selected predictors for combined vs target
     if linearmodel
@@ -116,14 +121,14 @@ for i = 1:numel(target)
         mdlCombined = fitrsvm(inputTrainSelected, targetTrain, 'KernelFunction','linear', 'Standardize',true);
     end
     
-    predictions2(i) = predict(mdlCombined, inputTestSelected);
+    predictions2(testIndices) = predict(mdlCombined, inputTestSelected);
     
     % Store the selected features for the current fold
     selectedFeaturesSTORE(selectedFeaturesidx) = 1;
     STORE = [STORE, selectedFeaturesSTORE];
     % Reset selectedFeaturesSTORE for the next fold
     selectedFeaturesSTORE = zeros(size(input, 2), 1);
-    fprintf('Progress: %.2f%%\n', 100 * i / numel(target));
+    fprintf('Progress: %.2f%%\n', 100 * testIndices / numel(target));
 end
 
 %% PLOT RESULTS
