@@ -22,12 +22,12 @@ TKApainpre = numericData(:, strcmp(numericTitles, 'TKA pain pre'));
 TKApainpost = numericData(:, strcmp(numericTitles, 'TKA pain post'));
 WOpainpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (pain)'));
 WOphyspre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (physical function)'));
-WOstyffpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (stiffness)'));
+WOstiffpre = numericData(:, strcmp(numericTitles, 'Pre-TKA,WOMAC (stiffness)'));
 WOpainpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA, Womac (pain)'));
 WOphyspost = numericData(:, strcmp(numericTitles, '1yr POST-TKA,Womac (phys func)'));
-WOstyffpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA,Womac (stiffness)'));
-WOtotpre = WOpainpre +WOphyspre + WOstyffpre;
-WOtotpost = WOpainpost +WOphyspost + WOstyffpost;
+WOstiffpost = numericData(:, strcmp(numericTitles, '1yr POST-TKA,Womac (stiffness)'));
+WOtotpre = WOpainpre +WOphyspre + WOstiffpre;
+WOtotpost = WOpainpost +WOphyspost + WOstiffpost;
 
 Promispre = numericData(:, strcmp(numericTitles, 'PRE-TKA, Promis (pain intensity)'));
 
@@ -42,7 +42,7 @@ rawChangeWO = WOpainpost - WOpainpre;
 
 ratioTKA = ratioimpr(TKApainpre,TKApainpost,eps);
 ratioWOpain = ratioimpr(WOpainpre,WOpainpost,eps);
-ratioWOstyff = ratioimpr(WOstyffpre,WOstyffpost,eps);
+ratioWOstiff = ratioimpr(WOstiffpre,WOstiffpost,eps);
 ratioWOphys = ratioimpr(WOphyspre,WOphyspost,eps);
 ratioWOtot = ratioimpr(WOtotpre,WOtotpost,eps);
 
@@ -56,7 +56,7 @@ ROIs = cat(2, SC, CC);
 %% PREDICTIONS
 
 % Specify the variable name you want to use
-optionname = 'styff';
+optionname = 'stiff';
 % Construct the variable names using the specified option
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
@@ -198,6 +198,31 @@ set(gca,'FontSize',15)
 
 % Display the plot
 grid on;
+%%
+
+variableName = [{'ratioWOpain'},{'ratioWOstiff'},{'ratioWOphys'},{'ratioWOtot'}];
+figure(11)
+
+subplot(1,3,1)
+[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{2}), 30, 'b');
+title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+ylabel(variableName(2));
+xlabel(variableName(1));
+
+subplot(1,3,2)
+[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{3}), 30, 'b');
+title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+ylabel(variableName(3));
+xlabel(variableName(1));
+
+subplot(1,3,3)
+[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{4}), 30, 'b');
+title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+ylabel(variableName(4));
+xlabel(variableName(1));
+
+
+
 
 %%
 % Feature selection criterion function for RFE

@@ -133,9 +133,11 @@ end
 
 %% PLOT RESULTS
 
-close;
+
 figure(11)
 [rho2, p2] = PlotSimpleCorrelationWithRegression(targetTrain, predict(mdlCombined, inputTrainSelected), 30, 'b');
+titleText = {"Training: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)};
+%title('hi')
 title({"Training: [PainPre, ROIs, geno] vs", sprintf("%s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
@@ -175,13 +177,13 @@ pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
-title = ['WOMAC Pain Pre' ,'genotype',numericTitles_sub]';
+titlen = ['WOMAC Pain Pre' ,'genotype',numericTitles_sub]';
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
 
 % Concatenate freqCell and title
-combinedData = [freqCell, title];
+combinedData = [freqCell, titlen];
 
 % Sort based on the first column (freq) in descending order
 sortedData = sortrows(combinedData, -1);
