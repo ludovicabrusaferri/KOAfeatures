@@ -58,7 +58,8 @@ ROIs = cat(2, SC, CC);
 
 ALL = [(ratioWOpain),WOpainpre,genotype,sex,ROIs];
 ALL = normvalues(ALL);
-varname = 'Norm. Impr';
+varname = 'Norm. Impr WO';
+modelname = "[PainPre, geno, sex, ROIs]"
 inputname = 'WOtotpre';
 % Remove rows with NaN values
 ALL(isnan(ALL(:, 1)), :) = [];
@@ -79,11 +80,15 @@ predictions1 = zeros(1, numel(target));
 predictedTarget = zeros(1, numel(target));
 
 numFolds =numel(predictions1);
-selectedFeaturesSTORE = zeros(size(input, 2), 1);
+
 STORE = [];
 
+
 % Leave-one-out cross-validation loop
-for fold = randperm(numFolds)
+for fold = (1:numFolds)
+    % Reset selectedFeaturesSTORE for the next fold
+    selectedFeaturesSTORE = zeros(size(input, 2), 1);
+
     % Calculate the indices for training and testing sets
     testIndices = round((fold - 1) * numel(target) / numFolds + 1 : fold * numel(target) / numFolds);
     trainIndices = setdiff(1:numel(target), testIndices);
@@ -100,33 +105,29 @@ for fold = randperm(numFolds)
     featureWeights = abs(mdl.Beta);
     [~, sortedIndices] = sort(featureWeights, 'descend');
     selectedFeaturesidx = sortedIndices(1:numSelectedFeatures);
+    selectedFeaturesSTORE(selectedFeaturesidx) = 1;
+    STORE = [STORE, selectedFeaturesSTORE];
 
     % Train the final model using selected features
     selectedInputTrain = inputTrain(:, selectedFeaturesidx);
     selectedInputTest = inputTest(:, selectedFeaturesidx);
     
-    finalModel = fitrsvm(selectedInputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
-
+    combinedModel = fitrsvm(selectedInputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
     % Make predictions on the test data
-    predictedTarget(testIndices) = predict(finalModel, selectedInputTest);
+    predictedTarget(testIndices) = predict(combinedModel, selectedInputTest);
 
-    % Evaluate the performance (you can replace this with your own evaluation metrics)
-    fprintf('Progress: %.2f%%\n', 100 * testIndices/ numel(target));
     
     % Fit linear model with selected predictors for input vs target
     mdl1 = fitlm(inputTrain(:, 1), targetTrain);
     predictions1(testIndices) = predict(mdl1, inputTest(1));
 
-    selectedFeaturesSTORE(selectedFeaturesidx) = 1;
-    STORE = [STORE, selectedFeaturesSTORE];
-    % Reset selectedFeaturesSTORE for the next fold
-    selectedFeaturesSTORE = zeros(size(input, 2), 1);
-    fprintf('Progress: %.2f%%\n', 100 * testIndices / numel(target));
+    % Evaluate the performance (you can replace this with your own evaluation metrics)
+    fprintf('Progress: %.2f%%\n', 100 * testIndices/ numel(target));
 end
 
 %%
 figure(2)
-subplot(1,3,1)
+subplot(1,2,1)
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictions1', 30, 'b');
 title({"Model: [PainPre]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
@@ -134,9 +135,9 @@ xlabel('True');
 xlim([0,1.3])
 ylim([0,1.3])
 hold off
-subplot(1,3,2)
+subplot(1,2,2)
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictedTarget', 30, 'b');
-title({"Model: [PainPre, ROIs, geno]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+title({sprintf("Model: %s", modelname), sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1.3])
