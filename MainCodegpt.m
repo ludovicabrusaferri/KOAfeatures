@@ -56,8 +56,7 @@ ROIs = cat(2, SC, CC);
 %% PREDICTIONS
 
 % Specify the variable name you want to use
-optionname = 'pain';
-
+optionname = 'styff';
 % Construct the variable names using the specified option
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
@@ -135,7 +134,7 @@ end
 figure(2)
 subplot(1,2,1)
 [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictions1', 30, 'b');
-title({"Model: [PainPre]", sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+title({sprintf("Model: %s",preVariableName), sprintf("vs %s", varname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
 ylabel('Predicted');
 xlabel('True');
 xlim([0,1.3])
