@@ -56,18 +56,16 @@ ROIs = cat(2, SC, CC);
 %% PREDICTIONS
 
 % Specify the variable name you want to use
-optionname = 'styff';
+optionname = 'pain';
 
 % Construct the variable names using the specified option
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
-
 % Use the constructed variable names in your code
 ALL = [eval(variableName), eval(preVariableName), genotype, sex, ROIs];
 ALL = normvalues(ALL);
 varname = ['Norm. Impr WO ' optionname];
-modelname = "[PainPre, geno, sex, ROIs]";
-inputname = [variableName 'pre'];
+modelname = [preVariableName,  ', geno, sex, ROIs'];
 
 % Remove rows with NaN values
 ALL(isnan(ALL(:, 1)), :) = [];
@@ -162,7 +160,7 @@ pattern = 'SC|CC';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
-titlen = [inputname,'genotype','sex',numericTitles_sub]';
+titlen = [preVariableName,'genotype','sex',numericTitles_sub]';
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
