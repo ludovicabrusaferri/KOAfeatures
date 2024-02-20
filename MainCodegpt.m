@@ -56,7 +56,7 @@ ROIs = cat(2, SC, CC);
 %% PREDICTIONS
 
 % Specify the variable name you want to use
-optionname = 'stiff';
+optionname = 'pain';
 % Construct the variable names using the specified option
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
@@ -64,7 +64,19 @@ preVariableName = ['WO' optionname 'pre'];
 ALL = [eval(variableName), eval(preVariableName), genotype, sex, ROIs];
 ALL = normvalues(ALL);
 varname = ['Norm. Impr WO ' optionname];
-modelname = [preVariableName,  ', geno, sex, ROIs'];
+modelname = [preVariableName, {'geno'}, {'sex'}];
+
+pattern = 'SC|CC';
+% Use regexp to find indices where the numericTitles match the pattern
+indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
+numericTitles_sub = numericTitles(indices);
+titlen = [modelname,numericTitles_sub]';
+
+modelname = [modelname, {'ROIs'}];
+
+% Convert the cell array to a single string
+modelname = strjoin(modelname, ' ');
+
 
 % Remove rows with NaN values
 ALL(isnan(ALL(:, 1)), :) = [];
@@ -155,11 +167,7 @@ hold off
 % Sum the frequencies across folds for selected features
 freq = sum(STORE, 2);
 
-pattern = 'SC|CC';
-% Use regexp to find indices where the numericTitles match the pattern
-indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
-numericTitles_sub = numericTitles(indices);
-titlen = [preVariableName,'genotype','sex',numericTitles_sub]';
+
 
 % Convert freq to a cell array
 freqCell = num2cell(freq);
