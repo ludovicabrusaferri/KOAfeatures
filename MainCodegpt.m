@@ -72,10 +72,10 @@ optionname = 'pain';
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
 % Use the constructed variable names in your code
-ALL = [eval(variableName), eval(preVariableName), genotype0,genotype1,  sex0,  sex1, ROIs];
+ALL = [eval(variableName), eval(preVariableName), genotype0,genotype1,  sex0,  sex1,ROIs];
 ALL = normvalues(ALL);
 varname = ['Norm. Impr WO ' optionname];
-modelname = [preVariableName, {'HAB'},{'MAB'}, {'M'}, {'F'}];
+modelname = [preVariableName, {'HAB'},{'MAB'}, {'M'}, {'F'}, ];
 
 pattern = 'SC|CC|PG';
 % Use regexp to find indices where the numericTitles match the pattern
