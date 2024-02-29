@@ -49,11 +49,22 @@ ratioWOtot = ratioimpr(WOtotpre,WOtotpost,eps);
 % Extract SC and CC variables for further analysis
 SC = numericData(:, strncmp(numericTitles, 'SC', 2));
 CC = numericData(:, strncmp(numericTitles, 'CC', 2));
-ROIs = cat(2, SC, CC);
+PG = numericData(:, strncmp(numericTitles, 'PG', 2));
+ROIs = cat(2, SC, CC, PG);
+
 
 
 
 %% PREDICTIONS
+
+% Assuming genotype is your original array
+genotype0 = genotype == 1; % This will be 1 (true) where genotype is 0, and 0 (false) otherwise
+genotype1 = genotype == 2; % This will be 1 (true) where genotype is 1, and 0 (false) otherwise
+
+
+% Assuming genotype is your original array
+sex0 = sex == 1; % This will be 1 (true) where genotype is 0, and 0 (false) otherwise
+sex1 = sex == 2; % This will be 1 (true) where genotype is 1, and 0 (false) otherwise
 
 % Specify the variable name you want to use
 optionname = 'pain';
@@ -61,12 +72,12 @@ optionname = 'pain';
 variableName = ['ratioWO' optionname];
 preVariableName = ['WO' optionname 'pre'];
 % Use the constructed variable names in your code
-ALL = [eval(variableName), eval(preVariableName), genotype, sex, ROIs];
+ALL = [eval(variableName), eval(preVariableName), genotype0,genotype1,  sex0,  sex1, ROIs];
 ALL = normvalues(ALL);
 varname = ['Norm. Impr WO ' optionname];
-modelname = [preVariableName, {'geno'}, {'sex'}];
+modelname = [preVariableName, {'HAB'},{'MAB'}, {'M'}, {'F'}];
 
-pattern = 'SC|CC';
+pattern = 'SC|CC|PG';
 % Use regexp to find indices where the numericTitles match the pattern
 indices = find(~cellfun('isempty', regexp(numericTitles, pattern)));
 numericTitles_sub = numericTitles(indices);
@@ -90,7 +101,7 @@ options = statset('UseParallel', true);
 
 % Initialize result containers
 mseValues = zeros(size(target));
-numSelectedFeatures = 15;  % Adjust as needed
+numSelectedFeatures = round(0.2*size(input,2));  % Adjust as needed
 
 % Initialize result containers
 predictions1 = zeros(1, numel(target));
@@ -207,29 +218,30 @@ set(gca,'FontSize',15)
 % Display the plot
 grid on;
 %%
+plothis=false
+if plothis
+    variableName = [{'ratioWOpain'},{'ratioWOstiff'},{'ratioWOphys'},{'ratioWOtot'}];
+    figure(11)
+    
+    subplot(1,3,1)
+    [rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{2}), 30, 'b');
+    title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+    ylabel(variableName(2));
+    xlabel(variableName(1));
+    
+    subplot(1,3,2)
+    [rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{3}), 30, 'b');
+    title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+    ylabel(variableName(3));
+    xlabel(variableName(1));
+    
+    subplot(1,3,3)
+    [rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{4}), 30, 'b');
+    title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
+    ylabel(variableName(4));
+    xlabel(variableName(1));
 
-variableName = [{'ratioWOpain'},{'ratioWOstiff'},{'ratioWOphys'},{'ratioWOtot'}];
-figure(11)
-
-subplot(1,3,1)
-[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{2}), 30, 'b');
-title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-ylabel(variableName(2));
-xlabel(variableName(1));
-
-subplot(1,3,2)
-[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{3}), 30, 'b');
-title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-ylabel(variableName(3));
-xlabel(variableName(1));
-
-subplot(1,3,3)
-[rho2, p2] = PlotSimpleCorrelationWithRegression(eval(variableName{1}), eval(variableName{4}), 30, 'b');
-title({sprintf("Rho: %.2f; p: %.2f", rho2, p2)});
-ylabel(variableName(4));
-xlabel(variableName(1));
-
-
+end
 
 
 %%
