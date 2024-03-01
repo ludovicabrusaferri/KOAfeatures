@@ -18,9 +18,9 @@ variables = computeMetrics(variables);
 
 % Normalization and preparation for analysis
 ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
-    variables.Genotype_1_GG_, variables.Sex_1_F_, variables.ROIs]);
+    variables.Genotype0, variables.Genotype0, variables.Sex0, variables.Sex1, variables.ROIs]);
 % Now, dynamically construct featureNames based on the variables you've included in ALL_DATA
-pNamesBase = {'WpainImpr', 'PreWpain', 'Genotype', 'Sex'};
+pNamesBase = {'WpainImpr', 'PreWpain', 'HAB','MAB', 'F', 'M'};
 variables.modelname='PrePain + Genotype + Sex + ROIs';
 variables.targetname=pNamesBase{1};
 
@@ -59,6 +59,14 @@ function variables = extractVariables(data, titles)
         cleanedName = matlab.lang.makeValidName(varName{1});
         variables.(cleanedName) = extract(varName{1});
     end
+    % Assuming genotype is your original array
+    variables.Genotype0 = variables.Genotype_1_GG_ == 1; % This will be 1 (true) where genotype is 0, and 0 (false) otherwise
+    variables.Genotype1 = variables.Genotype_1_GG_ == 2; % This will be 1 (true) where genotype is 1, and 0 (false) otherwise
+    
+    
+    % Assuming genotype is your original array
+    variables.Sex0 = variables.Sex_1_F_ == 1; % This will be 1 (true) where genotype is 0, and 0 (false) otherwise
+    variables.Sex1 = variables.Sex_1_F_ == 2; % This will be 1 (true) where genotype is 1, and 0 (false) otherwise
 end
 
 function variables = computeMetrics(variables)
