@@ -31,10 +31,10 @@ allpNames = [pNamesBase, roiFeatureNames];
 [target, input, featureNames] = prepareData(ALL_DATA, allpNames);
 
 % Leave-One-Out Cross-Validation with Feature Selection
-[selectedFeaturesSTORE, predictions, predictedTarget, STORE] = leaveOneOutCV(input, target, featureNames);
+[selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames);
 %
 % Plotting results
-plotResults(variables, target, predictions, predictedTarget, STORE, featureNames);
+plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS, featureNames);
 
 
 
@@ -105,9 +105,10 @@ function [target, input, featureNames] = prepareData(ALL_DATA, titles)
 end
 
 
-function [selectedFeaturesSTORE, predictions, predictedTarget, STORE] = leaveOneOutCV(input, target, featureNames)
+function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames)
     numFolds = size(input, 1);
     STORE = zeros(length(featureNames), numFolds); % Store selected features for each fold
+    WEIGHTS = zeros(length(featureNames), numFolds); % Store selected features for each fold
     predictions = zeros(size(target));
     predictedTarget = zeros(size(target));
     numSelectedFeatures = round(0.21 * size(input, 2)); % Adjust as needed
@@ -123,8 +124,8 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE] = leaveOne
         inputTest = input(testIndex, :);
 
         % Feature selection and SVM training
-        [selectedFeatures, ~] = featureSelectionSVM(inputTrain, targetTrain, numSelectedFeatures);
-
+        [selectedFeatures, model] = featureSelectionSVM(inputTrain, targetTrain, numSelectedFeatures);
+        WEIGHTS(:, fold) = model.Beta;
         % Store selected features
         STORE(:, fold) = selectedFeatures;
         selectedInputTrain = inputTrain(:, selectedFeatures==1);
@@ -137,11 +138,14 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE] = leaveOne
         % Fit linear model with selected predictors for input vs target
         mdl1 = fitlm(inputTrain(:, 1), targetTrain);
         predictions(testIndex) = predict(mdl1, inputTest(1));
-
-    
+        
+        
+        
     end
 
     selectedFeaturesSTORE = sum(STORE, 2); % Sum selected features across folds
+    %WEIGHTS=WEIGHTS;
+    %STORE=STORE;
 end
 
 function [selectedFeatures, model] = featureSelectionSVM(inputTrain, targetTrain, numSelectedFeatures)
@@ -156,7 +160,7 @@ function [selectedFeatures, model] = featureSelectionSVM(inputTrain, targetTrain
 end
 
 %%
-function plotResults(variables, target, predictions, predictedTarget, STORE, featureNames)
+function plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS,  featureNames)
     % Placeholder for result plotting
     % Access variables to plot graphs or results here
     subplot(2,3,2)
@@ -168,27 +172,38 @@ function plotResults(variables, target, predictions, predictedTarget, STORE, fea
     ylim([0,1.3])
     hold off
     
-    [sortedFreq, sortedTitleStrings] = sortfreq(STORE,featureNames);
+    [sortedFreq, sortedTitleStrings, sortedWeights] = sortfreq(STORE, WEIGHTS, featureNames);
 
-    % Plot the histogram using the histogram function
-    subplot(2,1,2)
-    bar(sortedFreq);
+    % Normalize the magnitude of sortedWeights to [0, 1] for transparency
+    maxWeight = max(abs(sortedWeights));
+    normalizedIntensity = abs(sortedWeights) / maxWeight;
+    
+    % Plot the histogram using colored bars with transparency
+    subplot(2,1,2);
+    % Plot with adjusted transparency
+    for i = 1:length(sortedFreq)
+        barColor = [1, 0, 0]; % Default to red, adjust as needed based on directionality
+        if sortedWeights(i) < 0
+            barColor = [0, 0, 1]; % Adjust to blue for negative weights
+        end
+        bar(i, sortedFreq(i), 'FaceColor', barColor, 'EdgeColor', 'none', 'FaceAlpha', normalizedIntensity(i));
+        hold on;
+    end
+    hold off; % Release the plot for further commands
+    
     % Set the x-axis labels to be the sorted titles
     xticks(1:length(sortedFreq));
     xticklabels(sortedTitleStrings);
-    % Rotate x-axis labels for better visibility
     xtickangle(45);
-    % Set axis labels and title
-    xlabel('Titles');
-    ylabel('Frequency');
-    %title('Histogram of Sorted Data');
-    set(gcf, 'Color', 'w');
-    set(gca,'FontSize',15)
     
-    % Display the plot
+    % Set axis labels and title
+    xlabel('Features');
+    ylabel('Frequency');
+    set(gcf, 'Color', 'w');
+    set(gca, 'FontSize', 15);
     grid on;
+        
 
-    hold off
 
     figure(2)
     [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictions, 30, 'b');
@@ -202,22 +217,71 @@ function plotResults(variables, target, predictions, predictedTarget, STORE, fea
 end
 
 
-function [sortedFreq, sortedTitleStrings] = sortfreq(STORE,featureNames)
+function [sortedFreq, sortedTitleStrings, sortedWeights] = sortfreq(STORE, WEIGHTS, featureNames)
 % Sum the frequencies across folds for selected features
     freq = sum(STORE, 2);
-    % Convert freq to a cell array
-    freqCell = num2cell(freq);
+    %%
+    sWEIGHTS = scaledown(WEIGHTS);
+    % Normalize weights row-wise for consistency in directionality
+    normalizedWeights = normalizeRows(sWEIGHTS);
+    
+    % Sum normalized weights across folds
+    summedNormalizedWeights = sum(normalizedWeights, 2);
+    summedNormalizedWeights = scaledown(summedNormalizedWeights);
+
+    % Sum weights for each feature across folds
+    %summedWeights = sum(sWEIGHTS, 2);
+
     % Concatenate freqCell and title
-    combinedData = [freqCell, featureNames'];
+    combinedData = [num2cell(freq), featureNames', num2cell(summedNormalizedWeights)];
 
     % Sort based on the first column (freq) in descending order
     sortedData = sortrows(combinedData, -1);
     
     % Extract the sorted freq and title
     sortedFreq = cell2mat(sortedData(:, 1));
+    sortedWeights = cell2mat(sortedData(:, 3));
+
     sortedTitle = sortedData(:, 2);
     % Plot the histogram using the histogram function
     % Plot the histogram
     % Convert the cell array of titles to a cell array of strings
     sortedTitleStrings = cellfun(@str2mat, sortedTitle, 'UniformOutput', false);
+end
+
+function scaledWeights = scaledown(WEIGHTS)
+    % Initialize scaledWeights with the same size as WEIGHTS
+    scaledWeights = zeros(size(WEIGHTS));
+    
+    % Iterate over each fold (column)
+    for col = 1:size(WEIGHTS, 2)
+        % Get the maximum absolute weight for the current column
+        maxWeight = max(abs(WEIGHTS(:, col)));
+        
+        % Scale down the weights for the current column
+        if maxWeight == 0
+            % Avoid division by zero if maxWeight is 0
+            scaledWeights(:, col) = WEIGHTS(:, col);
+        else
+            scaledWeights(:, col) = WEIGHTS(:, col) / maxWeight;
+        end
+    end
+end
+
+function normalizedWeights = normalizeRows(WEIGHTS)
+    % Preallocate the normalizedWeights matrix
+    normalizedWeights = zeros(size(WEIGHTS));
+    
+    % Iterate through each row (feature)
+    for i = 1:size(WEIGHTS, 1)
+        rowWeights = WEIGHTS(i, :);
+        maxAbsWeight = max(abs(rowWeights));
+        
+        % Avoid division by zero
+        if maxAbsWeight == 0
+            normalizedWeights(i, :) = rowWeights;
+        else
+            normalizedWeights(i, :) = rowWeights / maxAbsWeight;
+        end
+    end
 end
