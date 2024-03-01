@@ -31,7 +31,7 @@ allpNames = [pNamesBase, roiFeatureNames];
 [target, input, featureNames] = prepareData(ALL_DATA, allpNames);
 
 % Leave-One-Out Cross-Validation with Feature Selection
-[selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames);
+[selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames,'SVM');
 %
 % Plotting results
 plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS, featureNames);
@@ -113,7 +113,7 @@ function [target, input, featureNames] = prepareData(ALL_DATA, titles)
 end
 
 
-function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames)
+function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames, method)
     numFolds = size(input, 1);
     STORE = zeros(length(featureNames), numFolds); % Store selected features for each fold
     WEIGHTS = zeros(length(featureNames), numFolds); % Store selected features for each fold
@@ -132,7 +132,7 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] =
         inputTest = input(testIndex, :);
 
         % Feature selection and SVM training
-        [selectedFeatures, model] = featureSelectionSVM(inputTrain, targetTrain, numSelectedFeatures);
+        [selectedFeatures, model, coeff] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures);
         WEIGHTS(:, fold) = model.Beta;
         % Store selected features
         STORE(:, fold) = selectedFeatures;
@@ -156,16 +156,28 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] =
     %STORE=STORE;
 end
 
-function [selectedFeatures, model] = featureSelectionSVM(inputTrain, targetTrain, numSelectedFeatures)
-    % Implement RFE or other feature selection method here
-    % Placeholder for actual implementation
-    model = fitrsvm(inputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
-    featureWeights = abs(model.Beta);
-    [~, featureIdx] = sort(featureWeights, 'descend');
-    selectedFeaturesIdx = featureIdx(1:numSelectedFeatures);
-    selectedFeatures = zeros(size(inputTrain, 2), 1);
-    selectedFeatures(selectedFeaturesIdx) = 1;
+function [selectedFeatures, model, coeff] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures)
+    if strcmp(method, 'ElasticNet')
+        [B, FitInfo] = lasso(inputTrain, targetTrain, 'CV', 10); % Use 10-fold CV to choose lambda
+        bestLambda = FitInfo.LambdaMinMSE;
+        coeff = B(:, FitInfo.IndexMinMSE);
+        selectedFeatures = coeff ~= 0; % Indicator vector for selected features
+        model = []; % Elastic Net does not return a model object in the same way as SVM
+    elseif strcmp(method, 'SVM')
+        % Placeholder for SVM feature selection, adjust as needed
+        % This example uses all features and fits an SVM, real feature selection for SVM might require a different approach
+        model = fitrsvm(inputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
+        featureWeights = abs(model.Beta);
+        [~, featureIdx] = sort(featureWeights, 'descend');
+        selectedFeaturesIdx = featureIdx(1:numSelectedFeatures);
+        selectedFeatures = zeros(size(inputTrain, 2), 1);
+        selectedFeatures(selectedFeaturesIdx) = 1;
+        coeff = model.Beta; % Coefficients (weights) of the SVM model
+    else
+        error('Unsupported method. Choose either "ElasticNet" or "SVM".');
+    end
 end
+
 
 %%
 function plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS,  featureNames)
