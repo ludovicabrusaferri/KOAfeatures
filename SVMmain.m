@@ -15,6 +15,7 @@ variables = extractROIs(variables);
 
 % Perform computations
 variables = computeMetrics(variables);
+%variables.ratio_Pre_TKA_WOMAC_pain_(variables.ratio_Pre_TKA_WOMAC_pain_>0.999)=NaN;
 
 % Normalization and preparation for analysis
 ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
@@ -162,7 +163,7 @@ end
 
 function [selectedFeatures, model, coeff,intercept] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures)
     if strcmp(method, 'ElasticNet')
-        [B, FitInfo] = lasso(inputTrain, targetTrain, 'CV', 10); % Use 10-fold CV to choose lambda
+        [B, FitInfo] = lasso(inputTrain, targetTrain, 'CV', 10, 'Lambda', logspace(-4, 1, 100)); % Use 10-fold CV to choose lambda
         bestLambda = FitInfo.LambdaMinMSE;
         coeff = B(:, FitInfo.IndexMinMSE);
         selectedFeatures = coeff ~= 0; % Indicator vector for selected features
