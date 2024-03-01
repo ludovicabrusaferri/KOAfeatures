@@ -18,7 +18,7 @@ variables = computeMetrics(variables);
 
 % Normalization and preparation for analysis
 ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
-    variables.Genotype0, variables.Genotype0, variables.Sex0, variables.Sex1, variables.ROIs]);
+    variables.Genotype0, variables.Genotype1, variables.Sex0, variables.Sex1, variables.ROIs]);
 % Now, dynamically construct featureNames based on the variables you've included in ALL_DATA
 pNamesBase = {'WpainImpr', 'PreWpain', 'HAB','MAB', 'F', 'M'};
 variables.modelname='PrePain + Genotype + Sex + ROIs';
@@ -132,16 +132,22 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] =
         inputTest = input(testIndex, :);
 
         % Feature selection and SVM training
-        [selectedFeatures, model, coeff] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures);
-        WEIGHTS(:, fold) = model.Beta;
-        % Store selected features
-        STORE(:, fold) = selectedFeatures;
-        selectedInputTrain = inputTrain(:, selectedFeatures==1);
-        selectedInputTest = inputTest(:, selectedFeatures==1);
-        % SVM prediction
-        combinedModel = fitrsvm(selectedInputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
-        % Make predictions on the test data
-        predictedTarget(testIndex) = predict(combinedModel, selectedInputTest);
+        [selectedFeatures, model, coeff, intercept] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures);
+
+        if strcmp(method, 'ElasticNet')
+
+            prediction = inputTest * coeff + intercept; % Adjust for Elastic Net
+            predictedTarget(testIndex) = prediction;
+            WEIGHTS = [WEIGHTS, coeff]; % Append the coefficients
+            STORE(:, fold) = selectedFeatures;
+        elseif strcmp(method, 'SVM')
+            selectedInputTrain = inputTrain(:, selectedFeatures==1);
+            selectedInputTest = inputTest(:, selectedFeatures==1);
+            combinedModel = fitrsvm(selectedInputTrain, targetTrain, 'KernelFunction', 'linear', 'Standardize', true);
+            predictedTarget(testIndex) = predict(combinedModel, selectedInputTest);
+            WEIGHTS(:, fold) = coeff;
+            STORE(:, fold) = selectedFeatures;
+        end
 
         % Fit linear model with selected predictors for input vs target
         mdl1 = fitlm(inputTrain(:, 1), targetTrain);
@@ -152,17 +158,16 @@ function [selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] =
     end
 
     selectedFeaturesSTORE = sum(STORE, 2); % Sum selected features across folds
-    %WEIGHTS=WEIGHTS;
-    %STORE=STORE;
 end
 
-function [selectedFeatures, model, coeff] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures)
+function [selectedFeatures, model, coeff,intercept] = performFeatureSelection(inputTrain, targetTrain, method, numSelectedFeatures)
     if strcmp(method, 'ElasticNet')
         [B, FitInfo] = lasso(inputTrain, targetTrain, 'CV', 10); % Use 10-fold CV to choose lambda
         bestLambda = FitInfo.LambdaMinMSE;
         coeff = B(:, FitInfo.IndexMinMSE);
         selectedFeatures = coeff ~= 0; % Indicator vector for selected features
         model = []; % Elastic Net does not return a model object in the same way as SVM
+        intercept = FitInfo.Intercept(FitInfo.IndexMinMSE);
     elseif strcmp(method, 'SVM')
         % Placeholder for SVM feature selection, adjust as needed
         % This example uses all features and fits an SVM, real feature selection for SVM might require a different approach
@@ -173,6 +178,7 @@ function [selectedFeatures, model, coeff] = performFeatureSelection(inputTrain, 
         selectedFeatures = zeros(size(inputTrain, 2), 1);
         selectedFeatures(selectedFeaturesIdx) = 1;
         coeff = model.Beta; % Coefficients (weights) of the SVM model
+        intercept = [];
     else
         error('Unsupported method. Choose either "ElasticNet" or "SVM".');
     end
