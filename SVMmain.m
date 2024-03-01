@@ -248,13 +248,10 @@ function [sortedFreq, sortedTitleStrings, sortedWeights] = sortfreq(STORE, WEIGH
 % Sum the frequencies across folds for selected features
     freq = sum(STORE, 2);
     %%
-    sWEIGHTS = scaledown(WEIGHTS);
-    % Normalize weights row-wise for consistency in directionality
-    normalizedWeights = normalizeRows(sWEIGHTS);
+    normalizedWeights = normalizeWeights(WEIGHTS);
     
     % Sum normalized weights across folds
     summedNormalizedWeights = sum(normalizedWeights, 2);
-    summedNormalizedWeights = scaledown(summedNormalizedWeights);
 
     % Sum weights for each feature across folds
     %summedWeights = sum(sWEIGHTS, 2);
@@ -276,39 +273,31 @@ function [sortedFreq, sortedTitleStrings, sortedWeights] = sortfreq(STORE, WEIGH
     sortedTitleStrings = cellfun(@str2mat, sortedTitle, 'UniformOutput', false);
 end
 
-function scaledWeights = scaledown(WEIGHTS)
-    % Initialize scaledWeights with the same size as WEIGHTS
+function normalizedWeights = normalizeWeights(WEIGHTS)
+    % Initialize scaledWeights with the same size as WEIGHTS for column-wise scaling
     scaledWeights = zeros(size(WEIGHTS));
     
-    % Iterate over each fold (column)
+    % Scale down weights column-wise
     for col = 1:size(WEIGHTS, 2)
-        % Get the maximum absolute weight for the current column
         maxWeight = max(abs(WEIGHTS(:, col)));
-        
-        % Scale down the weights for the current column
         if maxWeight == 0
-            % Avoid division by zero if maxWeight is 0
             scaledWeights(:, col) = WEIGHTS(:, col);
         else
             scaledWeights(:, col) = WEIGHTS(:, col) / maxWeight;
         end
     end
-end
-
-function normalizedWeights = normalizeRows(WEIGHTS)
-    % Preallocate the normalizedWeights matrix
-    normalizedWeights = zeros(size(WEIGHTS));
     
-    % Iterate through each row (feature)
-    for i = 1:size(WEIGHTS, 1)
-        rowWeights = WEIGHTS(i, :);
+    % Initialize normalizedWeights with the same size as scaledWeights for row-wise normalization
+    normalizedWeights = zeros(size(scaledWeights));
+    
+    % Normalize weights row-wise
+    for row = 1:size(scaledWeights, 1)
+        rowWeights = scaledWeights(row, :);
         maxAbsWeight = max(abs(rowWeights));
-        
-        % Avoid division by zero
         if maxAbsWeight == 0
-            normalizedWeights(i, :) = rowWeights;
+            normalizedWeights(row, :) = rowWeights;
         else
-            normalizedWeights(i, :) = rowWeights / maxAbsWeight;
+            normalizedWeights(row, :) = rowWeights / maxAbsWeight;
         end
     end
 end
