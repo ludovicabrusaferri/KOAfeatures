@@ -17,22 +17,41 @@ variables = extractROIs(variables);
 variables = computeMetrics(variables);
 %variables.ratio_Pre_TKA_WOMAC_pain_(variables.ratio_Pre_TKA_WOMAC_pain_>0.999)=NaN;
 
-% Normalization and preparation for analysis
-ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
-    variables.Genotype0, variables.Genotype1, variables.Sex0, variables.Sex1, variables.ROIs]);
-% Now, dynamically construct featureNames based on the variables you've included in ALL_DATA
-pNamesBase = {'WpainImpr', 'PreWpain', 'HAB','MAB', 'F', 'M'};
-variables.modelname='PrePain + Genotype + Sex + ROIs';
-variables.targetname=pNamesBase{1};
+petonly=false;
 
-roiFeatureNames = variables.ROIstitles;
-allpNames = [pNamesBase, roiFeatureNames];
+if petonly
+    % Normalization and preparation for analysis
+    ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, ...
+        variables.Genotype0, variables.Genotype1, variables.Sex0, variables.Sex1, variables.ROIs]);
+    % Now, dynamically construct featureNames based on the variables you've included in ALL_DATA
+    pNamesBase = {'WpainImpr', 'HAB','MAB', 'F', 'M'};
+    variables.modelname='Genotype + Sex + ROIs';
+    variables.targetname=pNamesBase{1};
+    
+    roiFeatureNames = variables.ROIstitles;
+    allpNames = [pNamesBase, roiFeatureNames];
+
+else
+    % Normalization and preparation for analysis
+    ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
+        variables.Genotype0, variables.Genotype1, variables.Sex0, variables.Sex1, variables.ROIs]);
+    % Now, dynamically construct featureNames based on the variables you've included in ALL_DATA
+    pNamesBase = {'WpainImpr', 'PreWpain', 'HAB','MAB', 'F', 'M'};
+    variables.modelname='PrePain + Genotype + Sex + ROIs';
+    variables.targetname=pNamesBase{1};
+    
+    roiFeatureNames = variables.ROIstitles;
+    allpNames = [pNamesBase, roiFeatureNames];
+
+end
 
 % Assuming first column is the target for analysis
 [target, input, featureNames] = prepareData(ALL_DATA, allpNames);
 
+
+%%
 % Leave-One-Out Cross-Validation with Feature Selection
-[selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target, featureNames,'SVM');
+[selectedFeaturesSTORE, predictions, predictedTarget, STORE, WEIGHTS] = leaveOneOutCV(input, target , featureNames,'SVM');
 %
 % Plotting results
 plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS, featureNames);
@@ -90,7 +109,7 @@ end
 
 function variables = extractROIs(variables)
     % Extract ROIs using a pattern match for titles starting with 'SC', 'CC', or 'PG'
-    pattern = '^(SC|CC|PG)';
+    pattern = '^(SC|CC|PX)';
     roiIndices = find(~cellfun('isempty', regexp(variables.titles, pattern)));
     variables.ROIs = variables.numericData(:, roiIndices);
     variables.ROIstitles=variables.titles(:,roiIndices);
@@ -190,6 +209,7 @@ end
 function plotResults(variables, target, predictions, predictedTarget, STORE, WEIGHTS,  featureNames)
     % Placeholder for result plotting
     % Access variables to plot graphs or results here
+    figure(1)
     subplot(2,3,2)
     [rho2, p2] = PlotSimpleCorrelationWithRegression(target,  predictedTarget, 30, 'b');
     title({sprintf('Model:%s',variables.modelname), sprintf("Rho: %.2f; p: %.2f", rho2, p2)},'FontSize',18);
