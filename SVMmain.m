@@ -48,6 +48,8 @@ end
 % Assuming first column is the target for analysis
 [target, input, featureNames] = prepareData(ALL_DATA, allpNames);
 
+    
+[input,featureNames] = doPCA(input,featureNames,variables,pNamesBase);
 
 %%
 % Leave-One-Out Cross-Validation with Feature Selection
@@ -321,3 +323,53 @@ function normalizedWeights = normalizeWeights(WEIGHTS)
         end
     end
 end
+
+
+function [input,featureNames] = doPCA(input,featureNames,variables,pNamesBase)
+    [coeffPCA, ~, ~, ~, explained] = pca(input(:,6:end));
+    featureNamesR=featureNames(6:end);
+    % Extract the coefficients for the first principal component
+    firstPCA = coeffPCA(:,1);
+    threshold = 0 * max(abs(firstPCA));
+    % Find indices of significant features
+    significantFeatures = abs(firstPCA) >= threshold;
+    
+    
+    featureNamesPCA=featureNamesR;
+    
+    for i = 1:size(featureNamesR, 2)
+            if ~significantFeatures(i)
+                firstPCA(i)=NaN; % Setting less significant feature columns to NaN
+                featureNamesPCA{i} = 'insignificant';
+            end
+    end
+        
+    
+    
+    figure(1); % Corrected typo here from 'figre' to 'figure'
+    % Assuming 'featureNames' is defined earlier in your script and is a cell array of feature name strings
+    bar(firstPCA, 'FaceColor', 'm', 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+    
+    hold off; % Release the plot for further commands
+    
+    % Assuming you want the ticks only at significant features:
+    xticks(linspace(1,size(featureNamesR,2),size(featureNamesR,2)));
+    xticklabels(featureNamesR);
+    xtickangle(45);
+    
+    insignificantIndices = strcmp(featureNamesPCA, 'insignificant');
+        
+    % Remove insignificant features from the data
+    featureNamesPCA(:, insignificantIndices) = [];
+    
+    temp=variables.ROIs;
+    temp(:,isnan(firstPCA))=[]; 
+    variables.PCAROIs=temp;
+    
+    ALL_DATA = normalizeData([variables.ratio_Pre_TKA_WOMAC_pain_, variables.Pre_TKA_WOMAC_pain_, ...
+            variables.Genotype0, variables.Genotype1, variables.Sex0, variables.Sex1, variables.PCAROIs]);
+    allpNames=[pNamesBase, featureNamesPCA];
+    
+    [target, input, featureNames] = prepareData(ALL_DATA, allpNames);
+end
+
